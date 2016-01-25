@@ -1,6 +1,7 @@
 package jsr223.docker.compose;
 
 import jsr223.docker.compose.utils.DockerComposeUtilities;
+import lombok.extern.log4j.Log4j;
 import processbuilder.SingletonProcessBuilderFactory;
 
 import javax.script.ScriptEngine;
@@ -9,16 +10,32 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
+@Log4j
 public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
 
     // Script engine parameters
     private static final String NAME = "docker-compose";
     private static final String ENGINE = "docker-compose";
-    private static final String ENGINE_VERSION = "0.0.2";
+    private static final String ENGINE_VERSION;
     private static final String LANGUAGE = "yaml";
 
     private static final Map<String, Object> parameters = new HashMap<>();
+
+    static {
+        // The gradle.properties contains the current version. And the automated release process only updates
+        // the gradle.properties file. Therefore we use this file to determine the version.
+        Properties gradleProperties = new Properties();
+        try {
+            gradleProperties.load(DockerComposeScriptEngineFactory.class.getClassLoader().getResourceAsStream("version.properties"));
+        } catch (Exception e) {
+            log.warn("Could not load gradle.properties.");
+            System.out.println("Could not load gradle.properties.");
+        } finally {
+            ENGINE_VERSION = gradleProperties.getProperty("version", "notSpecified");
+        }
+    }
 
     public DockerComposeScriptEngineFactory() {
 

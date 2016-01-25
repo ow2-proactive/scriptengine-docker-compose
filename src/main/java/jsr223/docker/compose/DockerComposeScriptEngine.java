@@ -29,7 +29,7 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
     private static final EnvironmentVariablesAdder environmentVariablesAdder = new EnvironmentVariablesAdder();
 
     private static final String DOCKER_HOST_PROPERTY_NAME = "DOCKER_HOST";
-    private static final String log4jConfigurationFile = "config/log/scriptengines.properties";
+    private static final String LOG4J_CONFIGURATION_FILE = "config/log/scriptengines.properties";
 
 
     public DockerComposeScriptEngine() {
@@ -38,12 +38,12 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
         // Catch all exceptions to not sacrifice functionality for logging.
         try {
             org.apache.log4j.PropertyConfigurator.configure(getClass()
-                    .getClassLoader().getResourceAsStream(log4jConfigurationFile));
+                    .getClassLoader().getResourceAsStream(LOG4J_CONFIGURATION_FILE));
         } catch (NullPointerException e) {
-            System.err.println("Log4j configuration file not found: " + log4jConfigurationFile +
+            System.err.println("Log4j configuration file not found: " + LOG4J_CONFIGURATION_FILE +
                     ". Any output for the Docker Compose script engine is disabled.");
         } catch (Exception e) {
-            System.err.println("Log4j initialization failed: " + log4jConfigurationFile +
+            System.err.println("Log4j initialization failed: " + LOG4J_CONFIGURATION_FILE +
                     ". Docker Compose script engine is functional but logging is disabled." +
                     "Stacktrace is: ");
             e.printStackTrace();
