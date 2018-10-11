@@ -23,22 +23,21 @@
  * If needed, contact us to obtain a release under GPL Version 2 or 3
  * or a different license than the AGPL.
  */
-package jsr223.docker.compose;
+package jsr223.docker.file;
 
 import java.util.*;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 
-import jsr223.docker.compose.utils.DockerComposeVersionGetter;
 import processbuilder.SingletonProcessBuilderFactory;
 import processbuilder.utils.ProcessBuilderUtilities;
 
 
-public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
+public class DockerFileScriptEngineFactory implements ScriptEngineFactory {
 
     // Script engine parameters
-    private static final String NAME = "docker-compose";
+    private static final String NAME = "docker-file";
 
     private static final String ENGINE = NAME;
 
@@ -50,23 +49,23 @@ public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
 
     private ProcessBuilderUtilities processBuilderUtilities = new ProcessBuilderUtilities();
 
-    private DockerComposeVersionGetter dockerComposeVersionGetter = new DockerComposeVersionGetter(processBuilderUtilities);
+    private DockerFileVersionGetter dockerFileVersionGetter = new DockerFileVersionGetter(processBuilderUtilities);
 
-    public DockerComposeScriptEngineFactory() {
+    public DockerFileScriptEngineFactory() {
         parameters.put(ScriptEngine.NAME, NAME);
         parameters.put(ScriptEngine.ENGINE_VERSION, ENGINE_VERSION);
         parameters.put(ScriptEngine.LANGUAGE, LANGUAGE);
         parameters.put(ScriptEngine.ENGINE, ENGINE);
     }
 
-    public DockerComposeScriptEngineFactory(ProcessBuilderUtilities processBuilderUtilities,
-            DockerComposeVersionGetter dockerComposeVersionGetter) {
+    public DockerFileScriptEngineFactory(ProcessBuilderUtilities processBuilderUtilities,
+            DockerFileVersionGetter dockerFileVersionGetter) {
         this();
-        if (processBuilderUtilities == null || dockerComposeVersionGetter == null) {
+        if (processBuilderUtilities == null || dockerFileVersionGetter == null) {
             throw new NullPointerException("processBuilderUtilities and dockerComposeVersionGetter must not be null");
         }
         this.processBuilderUtilities = processBuilderUtilities;
-        this.dockerComposeVersionGetter = dockerComposeVersionGetter;
+        this.dockerFileVersionGetter = dockerFileVersionGetter;
 
     }
 
@@ -102,7 +101,7 @@ public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
 
     @Override
     public String getLanguageVersion() {
-        return dockerComposeVersionGetter.getDockerComposeVersion(SingletonProcessBuilderFactory.getInstance());
+        return dockerFileVersionGetter.getDockerFileVersion(SingletonProcessBuilderFactory.getInstance());
     }
 
     @Override
@@ -127,6 +126,7 @@ public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
 
     @Override
     public ScriptEngine getScriptEngine() {
-        return new DockerComposeScriptEngine();
+        return new DockerFileScriptEngine();
     }
+
 }

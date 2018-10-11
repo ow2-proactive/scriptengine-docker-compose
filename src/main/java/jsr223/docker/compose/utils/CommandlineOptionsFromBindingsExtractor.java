@@ -33,6 +33,7 @@ import java.util.Map;
 
 import javax.script.Bindings;
 
+import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.OptionType;
 import lombok.extern.log4j.Log4j;
 
 
@@ -52,6 +53,12 @@ public class CommandlineOptionsFromBindingsExtractor {
     public final static String DOCKER_COMPOSE_COMMANDLINE_OPTIONS_SPLIT_REGEX_KEY = "docker-compose-options-split-regex";
 
     public final static String DOCKER_COMPOSE_COMMANDLINE_OPTIONS_SPLIT_REGEX_DEFAULT = " ";
+
+    public final static String DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_DEFAULT = " ";
+
+    public final static String DOCKER_FILE_COMMANDLINE_OPTIONS_KEY = "docker-file-options";
+
+    public final static String DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_KEY = "docker-file-options-split-regex";
 
     public enum OptionType {
         UP_OPTION,
@@ -98,4 +105,40 @@ public class CommandlineOptionsFromBindingsExtractor {
         options.put(OptionType.UP_OPTION, upCmdOptions);
         return options;
     }
+
+    public Map<OptionType, List<String>> getDockerFileCommandOptions(Bindings bindings) {
+        if (!bindings.containsKey(GENERIC_INFORMATION_KEY)) {
+            return Collections.emptyMap();
+        }
+
+        Object bindingsObject = bindings.get(GENERIC_INFORMATION_KEY);
+        if (bindingsObject instanceof Map) {
+            Map<String, String> genericInformation = (Map<String, String>) bindings.get(GENERIC_INFORMATION_KEY);
+            return extractDockerFileUpCommandOptionsFromMap(genericInformation);
+        } else {
+            log.warn("Generic Information could not be retrieved. Docker command options could not be extracted.");
+            return Collections.emptyMap();
+        }
+    }
+
+    private Map<OptionType, List<String>>
+            extractDockerFileUpCommandOptionsFromMap(Map<String, String> genericInformationMap) {
+        List<String> upCmdOptions = Collections.emptyList();
+        List<String> generalCmdOptions = Collections.emptyList();
+        String splitCharacter = DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_DEFAULT;
+        if (genericInformationMap.get(DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_KEY) != null) {
+            splitCharacter = genericInformationMap.get(DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_KEY);
+        }
+
+        if (genericInformationMap.get(DOCKER_FILE_COMMANDLINE_OPTIONS_KEY) != null) {
+            generalCmdOptions = Arrays.asList(genericInformationMap.get(DOCKER_FILE_COMMANDLINE_OPTIONS_KEY)
+                                                                   .split(splitCharacter));
+        }
+
+        EnumMap<OptionType, List<String>> options = new EnumMap<OptionType, List<String>>(OptionType.class);
+        options.put(OptionType.GENERAL_OPTION, generalCmdOptions);
+        options.put(OptionType.UP_OPTION, upCmdOptions);
+        return options;
+    }
+
 }
