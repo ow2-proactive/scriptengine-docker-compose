@@ -37,13 +37,13 @@ import processbuilder.utils.ProcessBuilderUtilities;
 public class DockerFileScriptEngineFactory implements ScriptEngineFactory {
 
     // Script engine parameters
-    private static final String NAME = "docker-file";
+    private static final String NAME = "dockerfile";
 
-    private static final String ENGINE = NAME;
+    private static final String ENGINE = "Dockerfile creator";
 
     private static final String ENGINE_VERSION = "0.3.0";
 
-    private static final String LANGUAGE = "yaml";
+    private static final String LANGUAGE = "dockerfile";
 
     private final Map<String, Object> parameters = new HashMap<>();
 
@@ -62,7 +62,7 @@ public class DockerFileScriptEngineFactory implements ScriptEngineFactory {
             DockerFileVersionGetter dockerFileVersionGetter) {
         this();
         if (processBuilderUtilities == null || dockerFileVersionGetter == null) {
-            throw new NullPointerException("processBuilderUtilities and dockerComposeVersionGetter must not be null");
+            throw new NullPointerException("processBuilderUtilities and dockerFileVersionGetter must not be null");
         }
         this.processBuilderUtilities = processBuilderUtilities;
         this.dockerFileVersionGetter = dockerFileVersionGetter;
@@ -71,32 +71,32 @@ public class DockerFileScriptEngineFactory implements ScriptEngineFactory {
 
     @Override
     public String getEngineName() {
-        return (String) parameters.get(ScriptEngine.NAME);
+        return NAME;
     }
 
     @Override
     public String getEngineVersion() {
-        return (String) parameters.get(ScriptEngine.ENGINE_VERSION);
+        return ENGINE_VERSION;
     }
 
     @Override
     public List<String> getExtensions() {
-        return Arrays.asList("yml", "yaml");
+        return Collections.singletonList("dockerfile");
     }
 
     @Override
     public List<String> getMimeTypes() {
-        return Collections.singletonList("text/yaml");
+        return Collections.singletonList("text");
     }
 
     @Override
     public List<String> getNames() {
-        return Arrays.asList(ENGINE, "fig");
+        return Arrays.asList("dockerfile", "dockerfile");
     }
 
     @Override
     public String getLanguageName() {
-        return (String) parameters.get(ScriptEngine.LANGUAGE);
+        return LANGUAGE;
     }
 
     @Override

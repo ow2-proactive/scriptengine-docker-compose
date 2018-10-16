@@ -38,7 +38,7 @@ import lombok.extern.log4j.Log4j;
 @Log4j
 public class DockerFilePropertyLoader {
 
-    private final static String CONFIGURATION_FILE = "config/scriptengines/docker-compose.properties";
+    private final static String CONFIGURATION_FILE = "config/scriptengines/docker-file.properties";
 
     @Getter
     private final String dockerHost;

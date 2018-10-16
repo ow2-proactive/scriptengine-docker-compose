@@ -44,9 +44,9 @@ public class DockerFileVersionGetter {
     private ProcessBuilderUtilities processBuilderUtilities;
 
     /**
-     * Retrieves the docker file version.
+     * Retrieves the docker version.
      *
-     * @return The currently installed version return by the docker file command or an empty string
+     * @return The currently installed version return by the docker command or an empty string
      * the version could not be determined.
      */
     public String getDockerFileVersion(ProcessBuilderFactory factory) {

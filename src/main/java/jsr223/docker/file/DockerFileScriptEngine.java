@@ -29,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.util.List;
 import java.util.Map;
 
 import javax.script.*;
@@ -37,8 +36,6 @@ import javax.script.*;
 import jsr223.docker.compose.bindings.MapBindingsAdder;
 import jsr223.docker.compose.bindings.StringBindingsAdder;
 import jsr223.docker.compose.file.write.ConfigurationFileWriter;
-import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor;
-import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.OptionType;
 import jsr223.docker.compose.utils.Log4jConfigurationLoader;
 import jsr223.docker.compose.utils.ScriptContextBindingsExtractor;
 import jsr223.docker.compose.yaml.VariablesReplacer;
@@ -65,10 +62,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private DockerFileCommandCreator dockerFileCommandCreator = new DockerFileCommandCreator();
 
-    private CommandlineOptionsFromBindingsExtractor commandlineOptionsFromBindingsExtractor = new CommandlineOptionsFromBindingsExtractor();
-
-    private ScriptContextBindingsExtractor scriptContextBindingsExtractor = new ScriptContextBindingsExtractor();
-
     private Log4jConfigurationLoader log4jConfigurationLoader = new Log4jConfigurationLoader();
 
     public DockerFileScriptEngine() {
@@ -78,11 +71,9 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     @Override
     public Object eval(String script, ScriptContext context) throws ScriptException {
-        Bindings bindings = scriptContextBindingsExtractor.extractFrom(context);
-        Map<OptionType, List<String>> options = commandlineOptionsFromBindingsExtractor.getDockerFileCommandOptions(bindings);
 
-        // Create docker file command
-        String[] dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand(options);
+        // Create docker file command - a simple docker build command 
+        String[] dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand();
 
         // Create a process builder
         ProcessBuilder processBuilder = SingletonProcessBuilderFactory.getInstance()
@@ -100,13 +91,13 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         // Replace variables in configuration file
         String scriptReplacedVariables = variablesReplacer.replaceVariables(script, variablesMap);
 
-        File fileYamlFile = null;
+        File dockerfile = null;
 
         Thread shutdownHook = null;
 
         try {
-            fileYamlFile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
-                                                                   dockerFileCommandCreator.YAML_FILE_NAME);
+            dockerfile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
+                                                                 dockerFileCommandCreator.FILENAME);
 
             // Start process
             Process process = processBuilder.start();
@@ -116,23 +107,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
-
-            // Set shutdown hook
-            final Process shutdownHookProcessReference = process;
-            shutdownHook = new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        stopAndRemoveContainers().waitFor();
-                    } catch (IOException e) {
-                        //TODO improve message here
-                    } catch (InterruptedException e) {
-                        log.info("Container execution interrupted. " + e.getMessage());
-                    }
-                }
-            };
-
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
 
             // Wait for process to exit
             int exitValue = process.waitFor();
@@ -146,18 +120,12 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         } catch (InterruptedException e) {
             log.info("Container execution interrupted. " + e.getMessage());
         } finally {
-            try {
-                // Reset thread's interrupt flag
-                Thread.interrupted();
-                stopAndRemoveContainers().waitFor();
-            } catch (Exception e) {
-                log.error("Container removal was interrupted: " + e.getMessage());
-            }
+
             // Delete configuration file
-            if (fileYamlFile != null) {
-                boolean deleted = fileYamlFile.delete();
+            if (dockerfile != null) {
+                boolean deleted = dockerfile.delete();
                 if (!deleted) {
-                    log.warn("File: " + fileYamlFile.getAbsolutePath() + " was not deleted.");
+                    log.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
                 }
             }
             if (shutdownHook != null) {
@@ -165,12 +133,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             }
         }
         return null;
-    }
-
-    private Process stopAndRemoveContainers() throws IOException {
-        return SingletonProcessBuilderFactory.getInstance()
-                                             .getProcessBuilder(dockerFileCommandCreator.createDockerFileDownCommand())
-                                             .start();
     }
 
     // TODO: Test

@@ -37,57 +37,25 @@ import lombok.NoArgsConstructor;
 public class DockerFileCommandCreator {
 
     // Constants
-    public static final String YAML_FILE_NAME = "docker-file.yml";
+    public static final String BUILD_ARGUMENT = "build";
 
-    public static final String FILENAME_ARGUMENT = "-f";
-
-    public static final String START_CONTAINER_ARGUMENT = "up";
-
-    public static final String STOP_AND_REMOVE_CONTAINER_ARGUMENT = "down";
-
-    public static final String VOLUMES_ARGUMENT = "--volumes";
+    public static final String FILENAME = "Dockerfile";
 
     /**
-     * Construct docker file down command.
-     *
-     * @return String array representing a command.
-     */
-    public String[] createDockerFileDownCommand() {
-        List<String> command = new ArrayList<>();
-        addSudoAndDockerFileCommand(command);
-
-        // Stop and remove containers
-        command.add(STOP_AND_REMOVE_CONTAINER_ARGUMENT);
-        // Remove volumes with containers
-        command.add(VOLUMES_ARGUMENT);
-        return command.toArray(new String[command.size()]);
-    }
-
-    /**
-     * This method creates a bash command which starts docker-file with a given yaml file.
+     * This method creates a bash command which starts docker-file with a given file.
      *
      * @return A String array which contains the command as a separate @String and each
      * argument as a separate String.
      */
-    public String[] createDockerFileExecutionCommand(Map<OptionType, List<String>> commandOptions) {
+    public String[] createDockerFileExecutionCommand() {
         List<String> command = new ArrayList<>();
-        List<String> generalOptions = new ArrayList<>(commandOptions.get(OptionType.GENERAL_OPTION));
-        List<String> upOptions = new ArrayList<>(commandOptions.get(OptionType.UP_OPTION));
         addSudoAndDockerFileCommand(command);
 
-        // Add the general parameters
-        command.addAll(generalOptions);
+        // Add the build command
+        command.add(BUILD_ARGUMENT);
 
-        // Add filename argument
-        command.add(FILENAME_ARGUMENT);
-
-        // Add filename
-        command.add(YAML_FILE_NAME);
-
-        // Start container with argument
-        command.add(START_CONTAINER_ARGUMENT);
-
-        command.addAll(upOptions);
+        // Add the file
+        command.add(FILENAME);
 
         return command.toArray(new String[command.size()]);
     }
