@@ -27,9 +27,6 @@ package jsr223.docker.file;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.OptionType;
 import lombok.NoArgsConstructor;
 
 
@@ -42,7 +39,7 @@ public class DockerFileCommandCreator {
     public static final String FILENAME = "Dockerfile";
 
     /**
-     * This method creates a bash command which starts docker-file with a given file.
+     * This method creates a bash command which build an image based on a given dockerfile.
      *
      * @return A String array which contains the command as a separate @String and each
      * argument as a separate String.
@@ -54,8 +51,8 @@ public class DockerFileCommandCreator {
         // Add the build command
         command.add(BUILD_ARGUMENT);
 
-        // Add the file
-        command.add(FILENAME);
+        // Add the docker file
+        command.add(".");
 
         return command.toArray(new String[command.size()]);
     }

@@ -37,7 +37,6 @@ import jsr223.docker.compose.bindings.MapBindingsAdder;
 import jsr223.docker.compose.bindings.StringBindingsAdder;
 import jsr223.docker.compose.file.write.ConfigurationFileWriter;
 import jsr223.docker.compose.utils.Log4jConfigurationLoader;
-import jsr223.docker.compose.utils.ScriptContextBindingsExtractor;
 import jsr223.docker.compose.yaml.VariablesReplacer;
 import jsr223.docker.file.DockerFileCommandCreator;
 import jsr223.docker.file.DockerFileScriptEngine;
@@ -135,7 +134,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return null;
     }
 
-    // TODO: Test
     @Override
     public Object eval(Reader reader, ScriptContext context) throws ScriptException {
 
