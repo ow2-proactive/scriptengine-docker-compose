@@ -27,14 +27,26 @@ package jsr223.docker.file;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import lombok.NoArgsConstructor;
 
 
 @NoArgsConstructor
 public class DockerFileCommandCreator {
 
-    // Constants
+    // Constants for building the image
     public static final String BUILD_ARGUMENT = "build";
+
+    public static final String TAG_OPTION_ARGUMENT = "-t";
+
+    public static final String TAG_NAME_ARGUMENT = "lastbuttest";
+
+    // Constants for running the container
+    public static final String DOCKER_ARGUMENT = "docker";
+
+    public static final String RUN_ARGUMENT = "run";
+
+    public static final String T_OPTION_ARGUMENT = "-d";
 
     public static final String FILENAME = "Dockerfile";
 
@@ -51,8 +63,27 @@ public class DockerFileCommandCreator {
         // Add the build command
         command.add(BUILD_ARGUMENT);
 
+        // Add the tag option
+        command.add(TAG_OPTION_ARGUMENT);
+
+        // Add the tag name
+        command.add(TAG_NAME_ARGUMENT);
+
         // Add the docker file
         command.add(".");
+
+        return command.toArray(new String[command.size()]);
+    }
+
+    public String[] createDockerRunExecutionCommand() {
+        List<String> command = new ArrayList<>();
+        addSudoAndDockerFileCommand(command);
+
+        // Add the build command
+        command.add(RUN_ARGUMENT);
+
+        // Add the tag name
+        command.add(TAG_NAME_ARGUMENT);
 
         return command.toArray(new String[command.size()]);
     }

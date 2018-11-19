@@ -74,12 +74,19 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         // Create docker file command - a simple docker build command 
         String[] dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand();
 
-        // Create a process builder
-        ProcessBuilder processBuilder = SingletonProcessBuilderFactory.getInstance()
-                                                                      .getProcessBuilder(dockerFileCommand);
+        // Create docker file command - a simple docker build command 
+        String[] dockerRunCommand = dockerFileCommandCreator.createDockerRunExecutionCommand();
+
+        // Create a process builder for building image
+        ProcessBuilder processBuilderBuild = SingletonProcessBuilderFactory.getInstance()
+                                                                           .getProcessBuilder(dockerFileCommand);
+
+        // Create a process builder for running image
+        ProcessBuilder processBuilderRun = SingletonProcessBuilderFactory.getInstance()
+                                                                         .getProcessBuilder(dockerRunCommand);
 
         // Use process builder environment and fill it with environment variables
-        Map<String, String> variablesMap = processBuilder.environment();
+        Map<String, String> variablesMap = processBuilderBuild.environment();
 
         // Add string bindings as environment variables
         stringBindingsAdder.addBindingToStringMap(context.getBindings(ScriptContext.ENGINE_SCOPE), variablesMap);
@@ -98,22 +105,36 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             dockerfile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
                                                                  dockerFileCommandCreator.FILENAME);
 
-            // Start process
-            Process process = processBuilder.start();
+            // Start process build
+            Process processBuild = processBuilderBuild.start();
 
             // Attach streams
-            processBuilderUtilities.attachStreamsToProcess(process,
+            processBuilderUtilities.attachStreamsToProcess(processBuild,
+                                                           context.getWriter(),
+                                                           context.getErrorWriter(),
+                                                           context.getReader());
+            // Wait for process build to exit
+            int exitValueBuild = processBuild.waitFor();
+
+            // Start process build
+            Process processRun = processBuilderRun.start();
+
+            // Attach streams
+            processBuilderUtilities.attachStreamsToProcess(processRun,
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
 
             // Wait for process to exit
-            int exitValue = process.waitFor();
+            int exitValueRun = processRun.waitFor();
 
-            if (exitValue != 0) {
-                throw new ScriptException("Docker File failed with exit code " + exitValue);
+            if (exitValueBuild != 0) {
+                throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
             }
-            return exitValue;
+            if (exitValueRun != 0) {
+                throw new ScriptException("Docker Run failed with exit code " + exitValueBuild);
+            }
+            return exitValueBuild;
         } catch (IOException e) {
             log.warn("Failed to execute Docker File.", e);
         } catch (InterruptedException e) {
@@ -131,6 +152,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             }
         }
+
         return null;
     }
 
