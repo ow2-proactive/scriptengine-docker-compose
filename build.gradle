@@ -5,9 +5,10 @@ apply plugin: 'application'
 apply plugin: "org.sonarqube"
 // Add automated release process
 apply plugin: 'net.researchgate.release'
+apply plugin: 'eclipse'
 
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 // Load the version number. This file sits in resources to include it into the jar. Because the version
 // is needed at runtime.
@@ -25,7 +26,14 @@ install {
 defaultTasks 'jar'
 
 repositories {
-    mavenCentral()
+    if (project.hasProperty('local')) {
+        mavenLocal()
+    }
+    jcenter()
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
+    maven { url 'http://repository.activeeon.com/content/groups/proactive/'}
 }
 
 buildscript {
@@ -60,16 +68,33 @@ release {
     newVersionCommitMessage = '--ci-skip--[Gradle Release Plugin] - new version commit: '
 }
 
+configurations {
+    provided
+}
+
+sourceSets {
+    main {
+        main.compileClasspath += configurations.provided
+        test.compileClasspath += configurations.provided
+        test.runtimeClasspath += configurations.provided
+    }
+}
+
 dependencies {
     compile 'org.projectlombok:lombok:1.16.6'
     compile 'log4j:log4j:1.2.17'
+    provided 'org.ow2.proactive:scheduler-api:+'
+
     testCompile group: 'org.hamcrest', name: 'hamcrest-all', version: '1.1'
     testCompile('junit:junit:4.12') {
         exclude module: 'hamcrest'
         exclude module: 'hamcrest-core'
     }
     testCompile 'org.mockito:mockito-all:1.10.19'
+
 }
+
+
 
 // Must be called after dependencies
 jar {

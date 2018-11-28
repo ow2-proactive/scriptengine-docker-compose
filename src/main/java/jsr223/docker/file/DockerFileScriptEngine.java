@@ -27,6 +27,7 @@ package jsr223.docker.file;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Map;
@@ -41,6 +42,8 @@ import jsr223.docker.compose.yaml.VariablesReplacer;
 import jsr223.docker.file.DockerFileCommandCreator;
 import jsr223.docker.file.DockerFileScriptEngine;
 import jsr223.docker.file.DockerFileScriptEngineFactory;
+import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import lombok.extern.log4j.Log4j;
 import processbuilder.SingletonProcessBuilderFactory;
 import processbuilder.utils.ProcessBuilderUtilities;
@@ -63,6 +66,30 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private Log4jConfigurationLoader log4jConfigurationLoader = new Log4jConfigurationLoader();
 
+    private Process processRun = null;
+
+    private Process processBuild = null;
+
+    private String imageTagName = "demofabienimage";
+
+    private String containerTagName = "demofabiencontainer";
+
+    private String[] dockerFileCommand = null;
+
+    private String[] dockerRunCommand = null;
+
+    private String[] dockerStopCommand = null;
+
+    private String[] dockerRMCommand = null;
+
+    private String[] dockerRMICommand = null;
+
+    private boolean imageCreated = false;
+
+    private boolean containerStarted = false;
+
+    private File dockerfile = null;
+
     public DockerFileScriptEngine() {
         // This is the entry-point of the script engine
         log4jConfigurationLoader.loadLog4jConfiguration();
@@ -72,10 +99,10 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
     public Object eval(String script, ScriptContext context) throws ScriptException {
 
         // Create docker file command - a simple docker build command 
-        String[] dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand();
+        dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand(imageTagName);
 
-        // Create docker file command - a simple docker build command 
-        String[] dockerRunCommand = dockerFileCommandCreator.createDockerRunExecutionCommand();
+        // Create docker run command - a simple docker run command 
+        dockerRunCommand = dockerFileCommandCreator.createDockerRunExecutionCommand(containerTagName, imageTagName);
 
         // Create a process builder for building image
         ProcessBuilder processBuilderBuild = SingletonProcessBuilderFactory.getInstance()
@@ -97,27 +124,41 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         // Replace variables in configuration file
         String scriptReplacedVariables = variablesReplacer.replaceVariables(script, variablesMap);
 
-        File dockerfile = null;
-
         Thread shutdownHook = null;
 
         try {
+
             dockerfile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
                                                                  dockerFileCommandCreator.FILENAME);
 
             // Start process build
-            Process processBuild = processBuilderBuild.start();
+            processBuild = processBuilderBuild.start();
+
+            imageCreated = true;
+
+            shutdownHook = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    handleShutdown();
+                }
+            });
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
 
             // Attach streams
             processBuilderUtilities.attachStreamsToProcess(processBuild,
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
+
             // Wait for process build to exit
             int exitValueBuild = processBuild.waitFor();
 
-            // Start process build
-            Process processRun = processBuilderRun.start();
+            processBuild = null;
+
+            // Start process run
+            processRun = processBuilderRun.start();
+
+            containerStarted = true;
 
             // Attach streams
             processBuilderUtilities.attachStreamsToProcess(processRun,
@@ -128,12 +169,15 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             // Wait for process to exit
             int exitValueRun = processRun.waitFor();
 
+            processRun = null;
+
             if (exitValueBuild != 0) {
                 throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
             }
             if (exitValueRun != 0) {
                 throw new ScriptException("Docker Run failed with exit code " + exitValueBuild);
             }
+
             return exitValueBuild;
         } catch (IOException e) {
             log.warn("Failed to execute Docker File.", e);
@@ -141,16 +185,8 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             log.info("Container execution interrupted. " + e.getMessage());
         } finally {
 
-            // Delete configuration file
-            if (dockerfile != null) {
-                boolean deleted = dockerfile.delete();
-                if (!deleted) {
-                    log.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
-                }
-            }
-            if (shutdownHook != null) {
-                Runtime.getRuntime().removeShutdownHook(shutdownHook);
-            }
+            handleShutdown();
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
         }
 
         return null;
@@ -181,4 +217,103 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return new DockerFileScriptEngineFactory();
     }
 
+    private void stopAndRemoveContainer(String containerTagName) {
+
+        // Create docker stop container command - a simple docker stop command 
+        dockerStopCommand = dockerFileCommandCreator.createDockerStopExecutionCommand(containerTagName);
+
+        // Create docker remove container command - a simple docker rm command 
+        dockerRMCommand = dockerFileCommandCreator.createDockerRemoveExecutionCommand(containerTagName);
+
+        // Create a process builder for stopping container
+        ProcessBuilder processBuilderStop = SingletonProcessBuilderFactory.getInstance()
+                                                                          .getProcessBuilder(dockerStopCommand);
+
+        // Create a process builder for removing container
+        ProcessBuilder processBuilderRM = SingletonProcessBuilderFactory.getInstance()
+                                                                        .getProcessBuilder(dockerRMCommand);
+
+        //build processStop
+        Process processStop;
+        try {
+            processStop = processBuilderStop.start();
+
+            processBuilderUtilities.attachStreamsToProcess(processStop,
+                                                           context.getWriter(),
+                                                           context.getErrorWriter(),
+                                                           context.getReader());
+            processStop.waitFor();
+
+        } catch (IOException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+        }
+
+        //build processStop
+        Process processRM;
+        try {
+            processRM = processBuilderRM.start();
+
+            processBuilderUtilities.attachStreamsToProcess(processRM,
+                                                           context.getWriter(),
+                                                           context.getErrorWriter(),
+                                                           context.getReader());
+            processRM.waitFor();
+
+        } catch (IOException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+        }
+    }
+
+    private void removeImage(String imageTagName) {
+
+        // Create docker remove image command - a simple docker rmi command 
+        dockerRMICommand = dockerFileCommandCreator.createDockerRemoveImage(imageTagName);
+
+        // Create a process builder for removing image
+        ProcessBuilder processBuilderRMI = SingletonProcessBuilderFactory.getInstance()
+                                                                         .getProcessBuilder(dockerRMICommand);
+
+        Process processRMI;
+        try {
+            processRMI = processBuilderRMI.start();
+
+            processBuilderUtilities.attachStreamsToProcess(processRMI,
+                                                           context.getWriter(),
+                                                           context.getErrorWriter(),
+                                                           context.getReader());
+            processRMI.waitFor();
+
+        } catch (IOException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+        }
+    }
+
+    private void handleShutdown() {
+        // Delete configuration file
+        if (dockerfile != null) {
+            boolean deleted = dockerfile.delete();
+            if (!deleted) {
+                log.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
+            }
+        }
+
+        if (processBuild != null) {
+            processBuild.destroy();
+        }
+
+        if (processRun != null) {
+            processRun.destroy();
+        }
+
+        if (containerStarted) {
+            stopAndRemoveContainer(containerTagName);
+        }
+
+        if (imageCreated) {
+            removeImage(imageTagName);
+        }
+    }
 }

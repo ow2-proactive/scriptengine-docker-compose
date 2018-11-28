@@ -37,18 +37,23 @@ public class DockerFileCommandCreator {
     // Constants for building the image
     public static final String BUILD_ARGUMENT = "build";
 
-    public static final String TAG_OPTION_ARGUMENT = "-t";
+    public static final String IMAGE_TAG_OPTION_ARGUMENT = "-t";
 
-    public static final String TAG_NAME_ARGUMENT = "lastbuttest";
-
-    // Constants for running the container
-    public static final String DOCKER_ARGUMENT = "docker";
-
-    public static final String RUN_ARGUMENT = "run";
-
-    public static final String T_OPTION_ARGUMENT = "-d";
+    public static final String CONTAINER_NAME_OPTION_ARGUMENT = "--name";
 
     public static final String FILENAME = "Dockerfile";
+
+    // Constants for running the container
+    public static final String RUN_ARGUMENT = "run";
+
+    // Constants for stopping the container
+    public static final String STOP_ARGUMENT = "stop";
+
+    // Constants for deleting the container
+    public static final String RM_ARGUMENT = "rm";
+
+    // Constants for deleting image
+    public static final String RMI_ARGUMENT = "rmi";
 
     /**
      * This method creates a bash command which build an image based on a given dockerfile.
@@ -56,7 +61,7 @@ public class DockerFileCommandCreator {
      * @return A String array which contains the command as a separate @String and each
      * argument as a separate String.
      */
-    public String[] createDockerFileExecutionCommand() {
+    public String[] createDockerFileExecutionCommand(String imageTagName) {
         List<String> command = new ArrayList<>();
         addSudoAndDockerFileCommand(command);
 
@@ -64,10 +69,10 @@ public class DockerFileCommandCreator {
         command.add(BUILD_ARGUMENT);
 
         // Add the tag option
-        command.add(TAG_OPTION_ARGUMENT);
+        command.add(IMAGE_TAG_OPTION_ARGUMENT);
 
         // Add the tag name
-        command.add(TAG_NAME_ARGUMENT);
+        command.add(imageTagName);
 
         // Add the docker file
         command.add(".");
@@ -75,15 +80,60 @@ public class DockerFileCommandCreator {
         return command.toArray(new String[command.size()]);
     }
 
-    public String[] createDockerRunExecutionCommand() {
+    public String[] createDockerRunExecutionCommand(String containerTagName, String imageTagName) {
         List<String> command = new ArrayList<>();
         addSudoAndDockerFileCommand(command);
 
         // Add the build command
         command.add(RUN_ARGUMENT);
 
+        // Add container tag option
+        command.add(CONTAINER_NAME_OPTION_ARGUMENT);
+
+        // Add container tag name
+        command.add(containerTagName);
+
+        // Add image
+        command.add(imageTagName);
+
+        return command.toArray(new String[command.size()]);
+    }
+
+    public String[] createDockerStopExecutionCommand(String containerTagName) {
+        List<String> command = new ArrayList<>();
+        addSudoAndDockerFileCommand(command);
+
+        // Add the build command
+        command.add(STOP_ARGUMENT);
+
         // Add the tag name
-        command.add(TAG_NAME_ARGUMENT);
+        command.add(containerTagName);
+
+        return command.toArray(new String[command.size()]);
+    }
+
+    public String[] createDockerRemoveExecutionCommand(String containerTagName) {
+        List<String> command = new ArrayList<>();
+        addSudoAndDockerFileCommand(command);
+
+        // Add the build command
+        command.add(RM_ARGUMENT);
+
+        // Add the tag name
+        command.add(containerTagName);
+
+        return command.toArray(new String[command.size()]);
+    }
+
+    public String[] createDockerRemoveImage(String imageTagName) {
+        List<String> command = new ArrayList<>();
+        addSudoAndDockerFileCommand(command);
+
+        // Add the build command
+        command.add(RMI_ARGUMENT);
+
+        // Add the tag name
+        command.add(imageTagName);
 
         return command.toArray(new String[command.size()]);
     }
