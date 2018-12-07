@@ -32,7 +32,6 @@ import java.util.Properties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j;
-import org.objectweb.proactive.utils.OperatingSystem;
 
 
 @Log4j
@@ -93,14 +92,14 @@ public class DockerComposePropertyLoader {
                       " not found. Using system properties or standard values.", e);
         }
 
-        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase()
-                .contains("windows") || System.getProperty("os.name").toLowerCase().contains("mac os");
+        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase().contains("windows") ||
+                                 System.getProperty("os.name").toLowerCase().contains("mac os");
 
         // Get property, specify default value
-        this.dockerComposeCommand = isMacOrWindows
-                 ? getOverridenProperty(DOCKER_COMPOSE_COMMAND_WINDOWS,
-                                                          "docker-compose") : getOverridenProperty(DOCKER_COMPOSE_COMMAND,
-                        "/usr/local/bin/docker-compose");
+        this.dockerComposeCommand = isMacOrWindows ? getOverridenProperty(DOCKER_COMPOSE_COMMAND_WINDOWS,
+                                                                          "docker-compose")
+                                                   : getOverridenProperty(DOCKER_COMPOSE_COMMAND,
+                                                                          "/usr/local/bin/docker-compose");
         // Get property, specify default value
         this.sudoCommand = getOverridenProperty(DOCKER_COMPOSE_SUDO_COMMAND, "/usr/bin/sudo");
         // Get property, specify default value
