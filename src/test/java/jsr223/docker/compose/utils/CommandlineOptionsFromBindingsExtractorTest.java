@@ -106,14 +106,4 @@ public class CommandlineOptionsFromBindingsExtractorTest {
         assertTrue(upOptions.size() == 0);
     }
 
-    @Test
-    public void testThatNoGenericInformationReturnEmptyMap() {
-        CommandlineOptionsFromBindingsExtractor commandlineOptionsFromBindingsExtractor = new CommandlineOptionsFromBindingsExtractor();
-
-        Bindings bindings = new SimpleBindings();
-        Map<OptionType, List<String>> options = commandlineOptionsFromBindingsExtractor.getDockerComposeCommandOptions(bindings);
-
-        assertTrue(options.size() == 0);
-    }
-
 }

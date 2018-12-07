@@ -38,7 +38,7 @@ import processbuilder.utils.ProcessBuilderUtilities;
 public class DockerComposeScriptEngineFactory implements ScriptEngineFactory {
 
     // Script engine parameters
-    private static final String NAME = "docker-compose";
+    public static final String NAME = "docker-compose";
 
     private static final String ENGINE = NAME;
 

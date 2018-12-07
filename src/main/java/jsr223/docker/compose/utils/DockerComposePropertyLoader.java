@@ -26,12 +26,13 @@
 package jsr223.docker.compose.utils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j;
+import org.objectweb.proactive.utils.OperatingSystem;
 
 
 @Log4j
@@ -39,41 +40,81 @@ public class DockerComposePropertyLoader {
 
     private final static String CONFIGURATION_FILE = "config/scriptengines/docker-compose.properties";
 
-    @Getter
-    private final String dockerHost;
+    public static final String DOCKER_COMPOSE_COMMAND = "docker.compose.command";
+
+    public static final String DOCKER_COMPOSE_COMMAND_WINDOWS = "docker.compose.command.windows";
+
+    public static final String DOCKER_COMPOSE_SUDO_COMMAND = "docker.compose.sudo.command";
+
+    public static final String DOCKER_COMPOSE_USE_SUDO = "docker.compose.use.sudo";
+
+    public static final String DOCKER_HOST = "docker.host";
+
+    public static final String DOCKER_FILE_KEEP = "docker.file.keep";
 
     @Getter
-    private final String dockerComposeCommand;
+    @Setter
+    private String dockerHost;
 
     @Getter
-    private final String sudoCommand;
+    @Setter
+    private String dockerComposeCommand;
 
     @Getter
-    private final boolean useSudo;
+    @Setter
+    private String sudoCommand;
 
-    private final Properties properties;
+    @Getter
+    @Setter
+    private boolean useSudo;
+
+    @Getter
+    @Setter
+    private boolean keepDockerFile;
+
+    private Properties properties;
 
     private DockerComposePropertyLoader() {
+        reload();
+    }
+
+    /**
+     * Reload properties from the configuration file or system properties
+     */
+    public void reload() {
         properties = new Properties();
-        try {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE)) {
             log.debug("Load properties from configuration file: " + CONFIGURATION_FILE);
-            properties.load(getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE));
+            properties.load(inputStream);
         } catch (IOException | NullPointerException e) {
-            log.info("Configuration file " + CONFIGURATION_FILE + " not found. Standard values will be used.");
-            log.debug("Configuration file " + CONFIGURATION_FILE + " not found. Standard values will be used.", e);
+            log.info("Configuration file " + CONFIGURATION_FILE +
+                     " not found. Using system properties or standard values.");
+            log.debug("Configuration file " + CONFIGURATION_FILE +
+                      " not found. Using system properties or standard values.", e);
         }
 
+        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase()
+                .contains("windows") || System.getProperty("os.name").toLowerCase().contains("mac os");
+
         // Get property, specify default value
-        this.dockerComposeCommand = properties.getProperty("docker.compose.command",
-                                                           System.getProperty("os.name")
-                                                                 .toLowerCase()
-                                                                 .contains("windows") ? "docker-compose"
-                                                                                      : "/usr/local/bin/docker-compose");
+        this.dockerComposeCommand = isMacOrWindows
+                 ? getOverridenProperty(DOCKER_COMPOSE_COMMAND_WINDOWS,
+                                                          "docker-compose") : getOverridenProperty(DOCKER_COMPOSE_COMMAND,
+                        "/usr/local/bin/docker-compose");
         // Get property, specify default value
-        this.sudoCommand = properties.getProperty("docker.compose.sudo.command", "/usr/bin/sudo");
+        this.sudoCommand = getOverridenProperty(DOCKER_COMPOSE_SUDO_COMMAND, "/usr/bin/sudo");
         // Get property, specify default value
-        this.useSudo = Boolean.parseBoolean(properties.getProperty("docker.compose.use.sudo", "false"));
-        this.dockerHost = properties.getProperty("docker.host", "");
+        this.useSudo = Boolean.parseBoolean(getOverridenProperty(DOCKER_COMPOSE_USE_SUDO, "false"));
+        this.dockerHost = getOverridenProperty(DOCKER_HOST, "");
+        this.keepDockerFile = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_KEEP, "true"));
+    }
+
+    private String getOverridenProperty(String key, String defaultValue) {
+        if (System.getProperty(key) != null) {
+            return System.getProperty(key);
+        } else {
+            return properties.getProperty(key, defaultValue);
+        }
     }
 
     public static DockerComposePropertyLoader getInstance() {

@@ -34,6 +34,10 @@ import java.util.Map;
 
 import javax.script.*;
 
+import org.ow2.proactive.scheduler.common.SchedulerConstants;
+
+import com.google.common.io.Files;
+
 import jsr223.docker.compose.bindings.MapBindingsAdder;
 import jsr223.docker.compose.bindings.StringBindingsAdder;
 import jsr223.docker.compose.file.write.ConfigurationFileWriter;
@@ -102,10 +106,27 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
 
         Thread shutdownHook = null;
 
+        String localSpace = null;
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.DS_SCRATCH_BINDING_NAME)) {
+            localSpace = (String) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                         .get(SchedulerConstants.DS_SCRATCH_BINDING_NAME);
+        }
+
+        File directory;
+
+        if (localSpace != null) {
+            directory = new File(localSpace);
+        } else {
+            directory = Files.createTempDir();
+        }
+        processBuilder.directory(directory);
+
         try {
             composeYamlFile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
-                                                                      dockerComposeCommandCreator.YAML_FILE_NAME);
+                                                                      new File(directory,
+                                                                               dockerComposeCommandCreator.YAML_FILE_NAME).getAbsolutePath());
 
+            log.info("Running command: " + processBuilder.command());
             // Start process
             Process process = processBuilder.start();
 
@@ -152,7 +173,7 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
                 log.error("Container removal was interrupted: " + e.getMessage());
             }
             // Delete configuration file
-            if (composeYamlFile != null) {
+            if (composeYamlFile != null && !DockerComposePropertyLoader.getInstance().isKeepDockerFile()) {
                 boolean deleted = composeYamlFile.delete();
                 if (!deleted) {
                     log.warn("File: " + composeYamlFile.getAbsolutePath() + " was not deleted.");
@@ -166,12 +187,12 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
     }
 
     private Process stopAndRemoveContainers() throws IOException {
-        return SingletonProcessBuilderFactory.getInstance()
-                                             .getProcessBuilder(dockerComposeCommandCreator.createDockerComposeDownCommand())
-                                             .start();
+        ProcessBuilder builder = SingletonProcessBuilderFactory.getInstance()
+                                                               .getProcessBuilder(dockerComposeCommandCreator.createDockerComposeDownCommand());
+        log.info("Running command: " + builder.command());
+        return builder.start();
     }
 
-    // TODO: Test
     @Override
     public Object eval(Reader reader, ScriptContext context) throws ScriptException {
 
