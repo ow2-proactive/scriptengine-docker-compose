@@ -91,8 +91,7 @@ public class DockerFilePropertyLoader {
         }
 
         // Get property, specify default value
-        this.dockerFileCommand = getOverridenProperty(DOCKER_FILE_COMMAND,
-                                                      "docker");
+        this.dockerFileCommand = getOverridenProperty(DOCKER_FILE_COMMAND, "docker");
         // Get property, specify default value
         this.sudoCommand = getOverridenProperty(DOCKER_FILE_SUDO_COMMAND, "/usr/bin/sudo");
         // Get property, specify default value

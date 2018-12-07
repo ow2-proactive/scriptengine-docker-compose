@@ -37,8 +37,8 @@ public class DockerComposePropertyLoaderTest {
     @Test
     public void loadPropertiesFromPropertyFile() {
         DockerComposePropertyLoader.getInstance().reload();
-        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase()
-                .contains("windows") || System.getProperty("os.name").toLowerCase().contains("mac os");
+        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase().contains("windows") ||
+                                 System.getProperty("os.name").toLowerCase().contains("mac os");
         if (isMacOrWindows) {
             assertThat(DockerComposePropertyLoader.getInstance().getDockerComposeCommand(), is("test-compose-win"));
         } else {
