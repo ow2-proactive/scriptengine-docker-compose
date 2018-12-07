@@ -64,7 +64,11 @@ public class DockerComposePropertyLoader {
         }
 
         // Get property, specify default value
-        this.dockerComposeCommand = properties.getProperty("docker.compose.command", "/usr/local/bin/docker-compose");
+        this.dockerComposeCommand = properties.getProperty("docker.compose.command",
+                                                           System.getProperty("os.name")
+                                                                 .toLowerCase()
+                                                                 .contains("windows") ? "docker-compose"
+                                                                                      : "/usr/local/bin/docker-compose");
         // Get property, specify default value
         this.sudoCommand = properties.getProperty("docker.compose.sudo.command", "/usr/bin/sudo");
         // Get property, specify default value

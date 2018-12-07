@@ -65,7 +65,11 @@ public class DockerFilePropertyLoader {
         }
 
         // Get property, specify default value
-        this.dockerFileCommand = properties.getProperty("docker.file.command", "/usr/local/bin/docker");
+        this.dockerFileCommand = properties.getProperty("docker.file.command",
+                                                        System.getProperty("os.name")
+                                                              .toLowerCase()
+                                                              .contains("windows") ? "docker"
+                                                                                   : "/usr/local/bin/docker");
         // Get property, specify default value
         this.sudoCommand = properties.getProperty("docker.file.sudo.command", "/usr/bin/sudo");
         // Get property, specify default value
