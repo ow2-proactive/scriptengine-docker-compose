@@ -28,28 +28,33 @@ package jsr223.docker.compose.utils;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 
 public class DockerComposePropertyLoaderTest {
 
     @Test
-    public void loadPropertiesFromPropertyFileDockerComposeCommand() {
-        assertThat(DockerComposePropertyLoader.getInstance().getDockerComposeCommand(), is("test-compose"));
-    }
-
-    @Test
-    public void loadPropertiesFromPropertyFileSudoCommand() {
+    public void loadPropertiesFromPropertyFile() {
+        DockerComposePropertyLoader.getInstance().reload();
+        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase()
+                .contains("windows") || System.getProperty("os.name").toLowerCase().contains("mac os");
+        if (isMacOrWindows) {
+            assertThat(DockerComposePropertyLoader.getInstance().getDockerComposeCommand(), is("test-compose-win"));
+        } else {
+            assertThat(DockerComposePropertyLoader.getInstance().getDockerComposeCommand(), is("test-compose"));
+        }
         assertThat(DockerComposePropertyLoader.getInstance().getSudoCommand(), is("test-sudo"));
-    }
-
-    @Test
-    public void loadPropertiesFromPropertyFileDockerHost() {
         assertThat(DockerComposePropertyLoader.getInstance().getDockerHost(), is("test-test"));
+        assertThat(DockerComposePropertyLoader.getInstance().isUseSudo(), is(Boolean.TRUE));
+        assertThat(DockerComposePropertyLoader.getInstance().isKeepDockerFile(), is(Boolean.FALSE));
     }
 
     @Test
-    public void loadPropertiesFromPropertyFileUseSudo() {
-        assertThat(DockerComposePropertyLoader.getInstance().isUseSudo(), is(Boolean.TRUE));
+    public void loadSystemPropertiesOverridePropertyFile() {
+        System.setProperty(DockerComposePropertyLoader.DOCKER_COMPOSE_SUDO_COMMAND, "test2-sudo");
+        DockerComposePropertyLoader.getInstance().reload();
+        assertThat(DockerComposePropertyLoader.getInstance().getSudoCommand(), is("test2-sudo"));
+        assertThat(DockerComposePropertyLoader.getInstance().getDockerHost(), is("test-test"));
     }
 }

@@ -25,25 +25,21 @@
  */
 package jsr223.docker.file;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.io.StringWriter;
+import java.io.*;
 import java.util.Map;
 
 import javax.script.*;
+
+import org.ow2.proactive.scheduler.common.SchedulerConstants;
+import org.ow2.proactive.scheduler.task.SchedulerVars;
+
+import com.google.common.io.Files;
 
 import jsr223.docker.compose.bindings.MapBindingsAdder;
 import jsr223.docker.compose.bindings.StringBindingsAdder;
 import jsr223.docker.compose.file.write.ConfigurationFileWriter;
 import jsr223.docker.compose.utils.Log4jConfigurationLoader;
 import jsr223.docker.compose.yaml.VariablesReplacer;
-import jsr223.docker.file.DockerFileCommandCreator;
-import jsr223.docker.file.DockerFileScriptEngine;
-import jsr223.docker.file.DockerFileScriptEngineFactory;
-import lombok.AllArgsConstructor;
-import lombok.NonNull;
 import lombok.extern.log4j.Log4j;
 import processbuilder.SingletonProcessBuilderFactory;
 import processbuilder.utils.ProcessBuilderUtilities;
@@ -70,9 +66,13 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private Process processBuild = null;
 
-    private String imageTagName = "demofabienimage";
+    public static final String DEFAULT_IMAGE_NAME = "image";
 
-    private String containerTagName = "demofabiencontainer";
+    public static final String DEFAULT_CONTAINER_NAME = "container";
+
+    private String imageTagName = DEFAULT_IMAGE_NAME;
+
+    private String containerTagName = DEFAULT_CONTAINER_NAME;
 
     private String[] dockerFileCommand = null;
 
@@ -90,6 +90,10 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private File dockerfile = null;
 
+    private File directory = null;
+
+    private Bindings bindings = null;
+
     public DockerFileScriptEngine() {
         // This is the entry-point of the script engine
         log4jConfigurationLoader.loadLog4jConfiguration();
@@ -97,12 +101,18 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     @Override
     public Object eval(String script, ScriptContext context) throws ScriptException {
+        updateImageTagName(context);
+        updateContainerTagName(context);
+
+        bindings = context.getBindings(ScriptContext.ENGINE_SCOPE);
 
         // Create docker file command - a simple docker build command 
-        dockerFileCommand = dockerFileCommandCreator.createDockerFileExecutionCommand(imageTagName);
+        dockerFileCommand = dockerFileCommandCreator.createDockerBuildExecutionCommand(imageTagName, bindings);
 
         // Create docker run command - a simple docker run command 
-        dockerRunCommand = dockerFileCommandCreator.createDockerRunExecutionCommand(containerTagName, imageTagName);
+        dockerRunCommand = dockerFileCommandCreator.createDockerRunExecutionCommand(containerTagName,
+                                                                                    imageTagName,
+                                                                                    bindings);
 
         // Create a process builder for building image
         ProcessBuilder processBuilderBuild = SingletonProcessBuilderFactory.getInstance()
@@ -116,7 +126,19 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         Map<String, String> variablesMap = processBuilderBuild.environment();
 
         // Add string bindings as environment variables
-        stringBindingsAdder.addBindingToStringMap(context.getBindings(ScriptContext.ENGINE_SCOPE), variablesMap);
+        stringBindingsAdder.addBindingToStringMap(bindings, variablesMap);
+
+        String localSpace = null;
+        if (bindings.containsKey(SchedulerConstants.DS_SCRATCH_BINDING_NAME)) {
+            localSpace = (String) bindings.get(SchedulerConstants.DS_SCRATCH_BINDING_NAME);
+        }
+
+        if (localSpace != null) {
+            directory = new File(localSpace);
+        } else {
+            directory = Files.createTempDir();
+        }
+        processBuilderBuild.directory(directory);
 
         // Add DOCKER_HOST variable to execution environment
         variablesMap.put(DOCKER_HOST_PROPERTY_NAME, DockerFilePropertyLoader.getInstance().getDockerHost());
@@ -129,8 +151,11 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         try {
 
             dockerfile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
-                                                                 dockerFileCommandCreator.FILENAME);
+                                                                 (new File(directory,
+                                                                           dockerFileCommandCreator.FILENAME)).getAbsolutePath());
 
+            log.info("Docker file " + dockerfile + " created.");
+            log.info("Running command: " + processBuilderBuild.command());
             // Start process build
             processBuild = processBuilderBuild.start();
 
@@ -153,7 +178,13 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             // Wait for process build to exit
             int exitValueBuild = processBuild.waitFor();
 
+            if (exitValueBuild != 0) {
+                throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
+            }
+
             processBuild = null;
+
+            log.info("Running command: " + processBuilderRun.command());
 
             // Start process run
             processRun = processBuilderRun.start();
@@ -171,9 +202,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
             processRun = null;
 
-            if (exitValueBuild != 0) {
-                throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
-            }
             if (exitValueRun != 0) {
                 throw new ScriptException("Docker Run failed with exit code " + exitValueBuild);
             }
@@ -192,6 +220,30 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return null;
     }
 
+    private void updateImageTagName(ScriptContext context) {
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.VARIABLES_BINDING_NAME)) {
+            Map<String, Serializable> variables = (Map<String, Serializable>) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                                                                     .get(SchedulerConstants.VARIABLES_BINDING_NAME);
+            if (variables.containsKey(SchedulerVars.PA_JOB_ID.name()) &&
+                variables.containsKey(SchedulerVars.PA_TASK_ID.name())) {
+                imageTagName = imageTagName + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
+                               variables.get(SchedulerVars.PA_TASK_ID.name());
+            }
+        }
+    }
+
+    private void updateContainerTagName(ScriptContext context) {
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.VARIABLES_BINDING_NAME)) {
+            Map<String, Serializable> variables = (Map<String, Serializable>) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                                                                     .get(SchedulerConstants.VARIABLES_BINDING_NAME);
+            if (variables.containsKey(SchedulerVars.PA_JOB_ID.name()) &&
+                variables.containsKey(SchedulerVars.PA_TASK_ID.name())) {
+                containerTagName = containerTagName + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
+                                   variables.get(SchedulerVars.PA_TASK_ID.name());
+            }
+        }
+    }
+
     @Override
     public Object eval(Reader reader, ScriptContext context) throws ScriptException {
 
@@ -200,7 +252,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         try {
             ProcessBuilderUtilities.pipe(reader, stringWriter);
         } catch (IOException e) {
-            log.warn("Filed to convert Reader into StringWriter. Not possible to execute Docker File script.");
+            log.warn("Failed to convert Reader into StringWriter. Not possible to execute Docker File script.");
             log.debug("Filed to convert Reader into StringWriter. Not possible to execute Docker File script.", e);
         }
 
@@ -220,10 +272,10 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
     private void stopAndRemoveContainer(String containerTagName) {
 
         // Create docker stop container command - a simple docker stop command 
-        dockerStopCommand = dockerFileCommandCreator.createDockerStopExecutionCommand(containerTagName);
+        dockerStopCommand = dockerFileCommandCreator.createDockerStopExecutionCommand(containerTagName, bindings);
 
         // Create docker remove container command - a simple docker rm command 
-        dockerRMCommand = dockerFileCommandCreator.createDockerRemoveExecutionCommand(containerTagName);
+        dockerRMCommand = dockerFileCommandCreator.createDockerRemoveExecutionCommand(containerTagName, bindings);
 
         // Create a process builder for stopping container
         ProcessBuilder processBuilderStop = SingletonProcessBuilderFactory.getInstance()
@@ -236,6 +288,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         //build processStop
         Process processStop;
         try {
+            log.info("Running command: " + processBuilderStop.command());
             processStop = processBuilderStop.start();
 
             processBuilderUtilities.attachStreamsToProcess(processStop,
@@ -245,13 +298,13 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             processStop.waitFor();
 
         } catch (IOException | InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
         }
 
         //build processStop
         Process processRM;
         try {
+            log.info("Running command: " + processBuilderRM.command());
             processRM = processBuilderRM.start();
 
             processBuilderUtilities.attachStreamsToProcess(processRM,
@@ -261,7 +314,6 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             processRM.waitFor();
 
         } catch (IOException | InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
         }
     }
@@ -286,17 +338,18 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             processRMI.waitFor();
 
         } catch (IOException | InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
         }
     }
 
     private void handleShutdown() {
         // Delete configuration file
-        if (dockerfile != null) {
+        if (dockerfile != null && !DockerFilePropertyLoader.getInstance().isKeepDockerFile()) {
             boolean deleted = dockerfile.delete();
             if (!deleted) {
                 log.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
+            } else {
+                log.info("Docker file " + dockerfile + " successfully deleted.");
             }
         }
 

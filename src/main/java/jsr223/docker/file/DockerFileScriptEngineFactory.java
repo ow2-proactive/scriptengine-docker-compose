@@ -37,13 +37,13 @@ import processbuilder.utils.ProcessBuilderUtilities;
 public class DockerFileScriptEngineFactory implements ScriptEngineFactory {
 
     // Script engine parameters
-    private static final String NAME = "dockerfile";
+    public static final String NAME = "dockerfile";
 
-    private static final String ENGINE = "Docker image creator";
+    public static final String ENGINE = "Docker image creator";
 
-    private static final String ENGINE_VERSION = "0.3.0";
+    public static final String ENGINE_VERSION = "0.3.0";
 
-    private static final String LANGUAGE = "dockerfile";
+    public static final String LANGUAGE = "dockerfile";
 
     private final Map<String, Object> parameters = new HashMap<>();
 
