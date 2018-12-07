@@ -23,7 +23,7 @@
  * If needed, contact us to obtain a release under GPL Version 2 or 3
  * or a different license than the AGPL.
  */
-package jsr223.docker.compose.utils;
+package jsr223.docker.file;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,21 +32,18 @@ import java.util.Properties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j;
-import org.objectweb.proactive.utils.OperatingSystem;
 
 
 @Log4j
-public class DockerComposePropertyLoader {
+public class DockerFilePropertyLoader {
 
-    private final static String CONFIGURATION_FILE = "config/scriptengines/docker-compose.properties";
+    private final static String CONFIGURATION_FILE = "config/scriptengines/dockerfile.properties";
 
-    public static final String DOCKER_COMPOSE_COMMAND = "docker.compose.command";
+    public static final String DOCKER_FILE_COMMAND = "docker.file.command";
 
-    public static final String DOCKER_COMPOSE_COMMAND_WINDOWS = "docker.compose.command.windows";
+    public static final String DOCKER_FILE_SUDO_COMMAND = "docker.file.sudo.command";
 
-    public static final String DOCKER_COMPOSE_SUDO_COMMAND = "docker.compose.sudo.command";
-
-    public static final String DOCKER_COMPOSE_USE_SUDO = "docker.compose.use.sudo";
+    public static final String DOCKER_FILE_USE_SUDO = "docker.file.use.sudo";
 
     public static final String DOCKER_HOST = "docker.host";
 
@@ -58,7 +55,7 @@ public class DockerComposePropertyLoader {
 
     @Getter
     @Setter
-    private String dockerComposeCommand;
+    private String dockerFileCommand;
 
     @Getter
     @Setter
@@ -74,7 +71,7 @@ public class DockerComposePropertyLoader {
 
     private Properties properties;
 
-    private DockerComposePropertyLoader() {
+    private DockerFilePropertyLoader() {
         reload();
     }
 
@@ -83,8 +80,8 @@ public class DockerComposePropertyLoader {
      */
     public void reload() {
         properties = new Properties();
+        log.debug("Load properties from configuration file: " + CONFIGURATION_FILE);
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE)) {
-            log.debug("Load properties from configuration file: " + CONFIGURATION_FILE);
             properties.load(inputStream);
         } catch (IOException | NullPointerException e) {
             log.info("Configuration file " + CONFIGURATION_FILE +
@@ -93,18 +90,13 @@ public class DockerComposePropertyLoader {
                       " not found. Using system properties or standard values.", e);
         }
 
-        boolean isMacOrWindows = System.getProperty("os.name").toLowerCase()
-                .contains("windows") || System.getProperty("os.name").toLowerCase().contains("mac os");
-
         // Get property, specify default value
-        this.dockerComposeCommand = isMacOrWindows
-                 ? getOverridenProperty(DOCKER_COMPOSE_COMMAND_WINDOWS,
-                                                          "docker-compose") : getOverridenProperty(DOCKER_COMPOSE_COMMAND,
-                        "/usr/local/bin/docker-compose");
+        this.dockerFileCommand = getOverridenProperty(DOCKER_FILE_COMMAND,
+                                                      "docker");
         // Get property, specify default value
-        this.sudoCommand = getOverridenProperty(DOCKER_COMPOSE_SUDO_COMMAND, "/usr/bin/sudo");
+        this.sudoCommand = getOverridenProperty(DOCKER_FILE_SUDO_COMMAND, "/usr/bin/sudo");
         // Get property, specify default value
-        this.useSudo = Boolean.parseBoolean(getOverridenProperty(DOCKER_COMPOSE_USE_SUDO, "false"));
+        this.useSudo = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_USE_SUDO, "false"));
         this.dockerHost = getOverridenProperty(DOCKER_HOST, "");
         this.keepDockerFile = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_KEEP, "true"));
     }
@@ -117,20 +109,21 @@ public class DockerComposePropertyLoader {
         }
     }
 
-    public static DockerComposePropertyLoader getInstance() {
-        return DockerComposePropertyLoaderHolder.INSTANCE;
+    public static DockerFilePropertyLoader getInstance() {
+        return DockerFilePropertyLoaderHolder.INSTANCE;
     }
 
     /**
-     * Initializes DockerComposePropertyLoader.
+     * Initializes DockerFilePropertyLoader.
      * <p>
-     * DockerComposePropertyLoaderHolder is loaded on the first execution of DockerComposePropertyLoader.getInstance()
-     * or the first access to DockerComposePropertyLoaderHolder.INSTANCE, not before.
+     * DockerFilePropertyLoaderHolder is loaded on the first execution of DockerFilePropertyLoader.getInstance()
+     * or the first access to DockerFilePropertyLoaderHolder.INSTANCE, not before.
      **/
-    private static class DockerComposePropertyLoaderHolder {
-        private static final DockerComposePropertyLoader INSTANCE = new DockerComposePropertyLoader();
+    private static class DockerFilePropertyLoaderHolder {
+        private static final DockerFilePropertyLoader INSTANCE = new DockerFilePropertyLoader();
 
-        private DockerComposePropertyLoaderHolder() {
+        private DockerFilePropertyLoaderHolder() {
         }
     }
+
 }
