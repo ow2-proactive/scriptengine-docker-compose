@@ -1,1 +1,2 @@
 jsr223.docker.compose.DockerComposeScriptEngineFactory
+jsr223.docker.file.DockerFileScriptEngineFactory

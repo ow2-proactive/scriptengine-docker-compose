@@ -35,21 +35,22 @@ import java.nio.file.FileAlreadyExistsException;
 public class ConfigurationFileWriter {
 
     public File forceFileToDisk(String fileContent, String filenameAndPath) throws IOException {
-        File composeYamlFile = new File(filenameAndPath);
+        File dockerFile = new File(filenameAndPath);
         // Create configuration file
-        if (!composeYamlFile.createNewFile()) {
-            composeYamlFile.delete();
-            if (!composeYamlFile.createNewFile()) {
+        if (!dockerFile.createNewFile()) {
+            dockerFile.delete();
+            if (!dockerFile.createNewFile()) {
                 throw new FileAlreadyExistsException("Configuration file was deleted but still exists: " +
                                                      filenameAndPath);
             }
         }
 
         // Force configuration file to disk
-        Writer configFileWriter = new FileWriter(composeYamlFile);
-        configFileWriter.write(fileContent);
-        configFileWriter.close();
+        try (Writer configFileWriter = new FileWriter(dockerFile)) {
+            configFileWriter.write(fileContent);
+        }
 
-        return composeYamlFile;
+        return dockerFile;
     }
+
 }
