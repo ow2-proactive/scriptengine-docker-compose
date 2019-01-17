@@ -47,7 +47,9 @@ public class DockerFilePropertyLoader {
 
     public static final String DOCKER_HOST = "docker.host";
 
-    public static final String DOCKER_FILE_KEEP = "docker.file.keep";
+    public static final String DOCKER_FILE_KEEP = "docker.file.keepimage";
+
+    public static final String DOCKER_CONTAINER_KEEP = "docker.file.keepcontainer";
 
     @Getter
     @Setter
@@ -67,7 +69,7 @@ public class DockerFilePropertyLoader {
 
     @Getter
     @Setter
-    private boolean keepDockerFile;
+    private boolean keepDockerFile = false;
 
     private Properties properties;
 
@@ -97,7 +99,7 @@ public class DockerFilePropertyLoader {
         // Get property, specify default value
         this.useSudo = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_USE_SUDO, "false"));
         this.dockerHost = getOverridenProperty(DOCKER_HOST, "");
-        this.keepDockerFile = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_KEEP, "true"));
+        this.keepDockerFile = Boolean.parseBoolean(getOverridenProperty(DOCKER_FILE_KEEP, "false"));
     }
 
     private String getOverridenProperty(String key, String defaultValue) {
