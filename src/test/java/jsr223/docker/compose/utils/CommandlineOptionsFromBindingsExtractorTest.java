@@ -34,6 +34,10 @@ import java.util.Map;
 import javax.script.Bindings;
 import javax.script.SimpleBindings;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.OptionType;
@@ -44,6 +48,13 @@ import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.Optio
  * @since 01/02/2018
  */
 public class CommandlineOptionsFromBindingsExtractorTest {
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void testThatGenericInformationBindingsIsExtractedAndMapContentIsReturnedSplit() {

@@ -32,6 +32,10 @@ import static org.mockito.Mockito.when;
 import javax.script.ScriptContext;
 import javax.script.SimpleBindings;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -41,6 +45,13 @@ import org.mockito.Mockito;
  * @since 01/02/2018
  */
 public class ScriptContextBindingsExtractorTest {
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void testThatBindingsAreExtractedWithScopeConstant() {

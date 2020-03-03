@@ -52,7 +52,7 @@ public class ProcessBuilderUtilities {
                 try {
                     pipe(source, attachedSink);
                 } catch (IOException e) {
-                    log.error("Input stream pipe broke: " + e);
+                    // silently terminate
                 }
             }
         }.start();

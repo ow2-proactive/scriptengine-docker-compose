@@ -36,7 +36,11 @@ import static org.mockito.Mockito.when;
 import java.io.Reader;
 import java.io.Writer;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Assume;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Matchers;
 
@@ -45,6 +49,13 @@ import processbuilder.utils.ProcessBuilderUtilities;
 
 
 public class DockerComposeVersionGetterTest {
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void getDockerComposeVersionCallsProcessBuilderFactory() throws Exception {

@@ -42,10 +42,21 @@ import javax.script.Bindings;
 import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 
 public class StringBindingsAdderTest {
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void testStringStringMapsAsVariables() throws ScriptException, IOException {

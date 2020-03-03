@@ -35,6 +35,10 @@ import java.util.Map;
 
 import javax.script.ScriptException;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 
@@ -45,6 +49,13 @@ public class VariablesReplacerTest {
 
     private final static String yamlFileExpected = "EchoUbuntu:\n" + "    image: dockerfile/ubuntu\n" +
                                                    "    command: echo \"Hello World\"";
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void testVariableSubstitution() throws ScriptException, IOException {

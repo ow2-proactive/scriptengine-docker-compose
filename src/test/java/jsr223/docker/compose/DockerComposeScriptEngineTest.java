@@ -35,6 +35,8 @@ import java.util.Collections;
 import java.util.Map;
 
 import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -43,6 +45,7 @@ import org.ow2.proactive.scripting.ScriptResult;
 import org.ow2.proactive.scripting.SimpleScript;
 import org.ow2.proactive.scripting.TaskScript;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 
 import jsr223.docker.compose.utils.DockerComposePropertyLoader;
@@ -64,6 +67,7 @@ public class DockerComposeScriptEngineTest {
     public static void before() {
         BasicConfigurator.resetConfiguration();
         BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
         DockerComposePropertyLoader.getInstance().setDockerComposeCommand("docker-compose");
         DockerComposePropertyLoader.getInstance().setUseSudo(false);
         DockerComposePropertyLoader.getInstance().setDockerHost("");
@@ -81,8 +85,10 @@ public class DockerComposeScriptEngineTest {
         SimpleScript ss = new SimpleScript(dockerScript, DockerComposeScriptEngineFactory.NAME);
         TaskScript taskScript = new TaskScript(ss);
 
-        Map<String, Object> aBindings = Collections.singletonMap(SchedulerConstants.DS_SCRATCH_BINDING_NAME,
-                                                                 (Object) tempDir.getAbsolutePath());
+        Map<String, Object> aBindings = ImmutableMap.of(SchedulerConstants.DS_SCRATCH_BINDING_NAME,
+                                                        (Object) tempDir.getAbsolutePath(),
+                                                        SchedulerConstants.GENERIC_INFO_BINDING_NAME,
+                                                        Collections.EMPTY_MAP);
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
@@ -113,7 +119,10 @@ public class DockerComposeScriptEngineTest {
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-        ScriptResult<Serializable> res = taskScript.execute(null, new PrintStream(output), new PrintStream(output));
+        ScriptResult<Serializable> res = taskScript.execute(ImmutableMap.of(SchedulerConstants.GENERIC_INFO_BINDING_NAME,
+                                                                            Collections.EMPTY_MAP),
+                                                            new PrintStream(output),
+                                                            new PrintStream(output));
 
         System.out.println("Script output:");
         System.out.println(output.toString());
