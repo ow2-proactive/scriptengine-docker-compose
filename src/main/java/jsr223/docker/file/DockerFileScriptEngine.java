@@ -301,7 +301,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
         }
 
-        //build processStop
+        //build processRM
         Process processRM;
         try {
             log.info("Running command: " + processBuilderRM.command());
@@ -365,7 +365,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             stopAndRemoveContainer(containerTagName);
         }
 
-        if (imageCreated) {
+        if (imageCreated && !DockerFilePropertyLoader.getInstance().isKeepDockerFile()) {
             removeImage(imageTagName);
         }
     }
