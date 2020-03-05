@@ -34,6 +34,10 @@ import java.util.Map;
 
 import javax.script.*;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.WriterAppender;
 import org.ow2.proactive.scheduler.common.SchedulerConstants;
 
 import com.google.common.io.Files;
@@ -73,13 +77,37 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
 
     private Log4jConfigurationLoader log4jConfigurationLoader = new Log4jConfigurationLoader();
 
+    private static long loggerId = 0;
+
+    private Logger engineLogger;
+
+    private Appender engineLoggerAppender;
+
+    File composeDirectory;
+
     public DockerComposeScriptEngine() {
         // This is the entry-point of the script engine
         log4jConfigurationLoader.loadLog4jConfiguration();
     }
 
+    private void initLogger(ScriptContext context) {
+        engineLogger = Logger.getLogger(DockerComposeScriptEngine.class.getSimpleName() + loggerId++);
+        engineLoggerAppender = new WriterAppender(new SimpleLayout(), context.getErrorWriter());
+        engineLogger.addAppender(engineLoggerAppender);
+    }
+
+    private void cleanLogger() {
+        if (engineLogger != null && engineLoggerAppender != null) {
+            engineLogger.removeAppender(engineLoggerAppender);
+            engineLoggerAppender.close();
+            engineLogger = null;
+            engineLoggerAppender = null;
+        }
+    }
+
     @Override
-    public Object eval(String script, ScriptContext context) throws ScriptException {
+    public Object eval(String script, final ScriptContext context) throws ScriptException {
+        initLogger(context);
         Bindings bindings = scriptContextBindingsExtractor.extractFrom(context);
         Map<OptionType, List<String>> options = commandlineOptionsFromBindingsExtractor.getDockerComposeCommandOptions(bindings);
 
@@ -112,21 +140,20 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
                                          .get(SchedulerConstants.DS_SCRATCH_BINDING_NAME);
         }
 
-        File directory;
-
         if (localSpace != null) {
-            directory = new File(localSpace);
+            composeDirectory = new File(localSpace);
         } else {
-            directory = Files.createTempDir();
+            composeDirectory = Files.createTempDir();
         }
-        processBuilder.directory(directory);
+        processBuilder.directory(composeDirectory);
 
         try {
             composeYamlFile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
-                                                                      new File(directory,
+                                                                      new File(composeDirectory,
                                                                                dockerComposeCommandCreator.YAML_FILE_NAME).getAbsolutePath());
 
-            log.info("Running command: " + processBuilder.command());
+            engineLogger.info("Docker compose file " + composeYamlFile + " created.");
+            engineLogger.info("Running command: " + processBuilder.command());
             // Start process
             Process process = processBuilder.start();
 
@@ -141,13 +168,18 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
             shutdownHook = new Thread() {
                 @Override
                 public void run() {
+                    // unfortunately shutdown hooks are not run on windows when the process is terminated using
+                    // process.destroy(). At the moment, this issue cannot be solved and docker compose tasks cannot
+                    // be killed properly on windows in ProActive Scheduler task fork mode (which uses process.destroy()).
+                    // see https://bugs.openjdk.java.net/browse/JDK-8056139
                     try {
-                        stopAndRemoveContainers().waitFor();
+                        stopAndRemoveContainers(context).waitFor();
                     } catch (IOException e) {
                         //TODO improve message here
                     } catch (InterruptedException e) {
-                        log.info("Container execution interrupted. " + e.getMessage());
+                        engineLogger.info("Container execution interrupted. " + e.getMessage());
                     }
+                    cleanLogger();
                 }
             };
 
@@ -161,36 +193,44 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
             }
             return exitValue;
         } catch (IOException e) {
-            log.warn("Failed to execute Docker Compose.", e);
+            engineLogger.warn("Failed to execute Docker Compose.", e);
         } catch (InterruptedException e) {
-            log.info("Container execution interrupted. " + e.getMessage());
+            engineLogger.info("Container execution interrupted. " + e.getMessage());
         } finally {
             try {
                 // Reset thread's interrupt flag
                 Thread.interrupted();
-                stopAndRemoveContainers().waitFor();
+                stopAndRemoveContainers(context).waitFor();
             } catch (Exception e) {
-                log.error("Container removal was interrupted: " + e.getMessage());
+                engineLogger.error("Container removal was interrupted: " + e.getMessage());
             }
             // Delete configuration file
             if (composeYamlFile != null && !DockerComposePropertyLoader.getInstance().isKeepDockerFile()) {
                 boolean deleted = composeYamlFile.delete();
                 if (!deleted) {
-                    log.warn("File: " + composeYamlFile.getAbsolutePath() + " was not deleted.");
+                    engineLogger.warn("File: " + composeYamlFile.getAbsolutePath() + " was not deleted.");
                 }
             }
             if (shutdownHook != null) {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             }
+            cleanLogger();
         }
         return null;
     }
 
-    private Process stopAndRemoveContainers() throws IOException {
+    private Process stopAndRemoveContainers(ScriptContext context) throws IOException {
+
         ProcessBuilder builder = SingletonProcessBuilderFactory.getInstance()
                                                                .getProcessBuilder(dockerComposeCommandCreator.createDockerComposeDownCommand());
-        log.info("Running command: " + builder.command());
-        return builder.start();
+        builder.directory(composeDirectory);
+        engineLogger.info("Running command: " + builder.command());
+        Process process = builder.start();
+        processBuilderUtilities.attachStreamsToProcess(process,
+                                                       context.getWriter(),
+                                                       context.getErrorWriter(),
+                                                       context.getReader());
+        return process;
     }
 
     @Override
@@ -201,8 +241,9 @@ public class DockerComposeScriptEngine extends AbstractScriptEngine {
         try {
             ProcessBuilderUtilities.pipe(reader, stringWriter);
         } catch (IOException e) {
-            log.warn("Filed to convert Reader into StringWriter. Not possible to execute Docker Compose script.");
-            log.debug("Filed to convert Reader into StringWriter. Not possible to execute Docker Compose script.", e);
+            engineLogger.warn("Filed to convert Reader into StringWriter. Not possible to execute Docker Compose script.");
+            engineLogger.debug("Filed to convert Reader into StringWriter. Not possible to execute Docker Compose script.",
+                               e);
         }
 
         return eval(stringWriter.toString(), context);

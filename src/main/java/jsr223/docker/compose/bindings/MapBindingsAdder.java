@@ -47,8 +47,8 @@ public class MapBindingsAdder {
         if (containsKeyAndValue(entry) && valueIsMapType(entry)) {
             addEntryToEnvironmentWhichIsAMapContainingStrings(environment, entry);
         } else {
-            log.warn("Ignored binding: " + entry.getKey() + "(" + getClassName(entry.getKey()) + "):" +
-                     entry.getValue() + "(" + getClassName(entry.getValue()) + ")");
+            log.debug("Ignored binding: " + entry.getKey() + "(" + getClassName(entry.getKey()) + "):" +
+                      entry.getValue() + "(" + getClassName(entry.getValue()) + ")");
 
         }
     }

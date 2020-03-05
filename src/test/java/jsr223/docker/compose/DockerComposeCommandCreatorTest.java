@@ -34,7 +34,11 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor.OptionType;
@@ -45,6 +49,13 @@ import testing.utils.ReflectionUtilities;
 public class DockerComposeCommandCreatorTest {
 
     private final DockerComposeCommandCreator dockerCommandCreator = new DockerComposeCommandCreator();
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test
     public void testDockerExecutionCommandWithSudo() throws NoSuchFieldException, IllegalAccessException {
@@ -77,6 +88,8 @@ public class DockerComposeCommandCreatorTest {
 
         // Check if sudo is added correctly
         index = checkSudoAndComposeCommand(command, index);
+
+        Assert.assertEquals("No-ansi option must be used.", dockerCommandCreator.NO_ANSI_OPTION, command[index++]);
 
         // Check if stop and remove (down) argument is next
         Assert.assertEquals("Down option must be used.",
@@ -112,6 +125,10 @@ public class DockerComposeCommandCreatorTest {
 
         // Check if sudo and compose command are added correctly
         index = checkSudoAndComposeCommand(command, index);
+
+        Assert.assertEquals("No ansi option must be used.",
+                            DockerComposeCommandCreator.NO_ANSI_OPTION,
+                            command[index++]);
 
         // Check if file argument is used
         Assert.assertEquals("File option must be used.",

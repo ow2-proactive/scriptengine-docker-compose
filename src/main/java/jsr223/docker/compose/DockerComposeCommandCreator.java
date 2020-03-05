@@ -48,6 +48,8 @@ public class DockerComposeCommandCreator {
 
     public static final String VOLUMES_ARGUMENT = "--volumes";
 
+    public static final String NO_ANSI_OPTION = "--no-ansi";
+
     /**
      * Construct docker compose down command.
      *
@@ -57,6 +59,7 @@ public class DockerComposeCommandCreator {
         List<String> command = new ArrayList<>();
         addSudoAndDockerComposeCommand(command);
 
+        command.add(NO_ANSI_OPTION);
         // Stop and remove containers
         command.add(STOP_AND_REMOVE_CONTAINER_ARGUMENT);
         // Remove volumes with containers
@@ -74,6 +77,7 @@ public class DockerComposeCommandCreator {
         List<String> command = new ArrayList<>();
         List<String> generalOptions = new ArrayList<>(commandOptions.get(OptionType.GENERAL_OPTION));
         List<String> upOptions = new ArrayList<>(commandOptions.get(OptionType.UP_OPTION));
+        generalOptions.add(NO_ANSI_OPTION);
         addSudoAndDockerComposeCommand(command);
 
         // Add the general parameters

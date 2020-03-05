@@ -30,11 +30,16 @@ import java.util.Map;
 
 import javax.script.*;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
+import org.apache.log4j.WriterAppender;
 import org.ow2.proactive.scheduler.common.SchedulerConstants;
 import org.ow2.proactive.scheduler.task.SchedulerVars;
 
 import com.google.common.io.Files;
 
+import jsr223.docker.compose.DockerComposeScriptEngine;
 import jsr223.docker.compose.bindings.MapBindingsAdder;
 import jsr223.docker.compose.bindings.StringBindingsAdder;
 import jsr223.docker.compose.file.write.ConfigurationFileWriter;
@@ -94,13 +99,35 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private Bindings bindings = null;
 
+    private static long loggerId = 0;
+
+    private Logger engineLogger;
+
+    private Appender engineLoggerAppender;
+
     public DockerFileScriptEngine() {
         // This is the entry-point of the script engine
         log4jConfigurationLoader.loadLog4jConfiguration();
     }
 
+    private void initLogger(ScriptContext context) {
+        engineLogger = Logger.getLogger(DockerComposeScriptEngine.class.getSimpleName() + loggerId++);
+        engineLoggerAppender = new WriterAppender(new SimpleLayout(), context.getErrorWriter());
+        engineLogger.addAppender(engineLoggerAppender);
+    }
+
+    private void cleanLogger() {
+        if (engineLogger != null && engineLoggerAppender != null) {
+            engineLogger.removeAppender(engineLoggerAppender);
+            engineLoggerAppender.close();
+            engineLogger = null;
+            engineLoggerAppender = null;
+        }
+    }
+
     @Override
     public Object eval(String script, ScriptContext context) throws ScriptException {
+        initLogger(context);
         updateImageTagName(context);
         updateContainerTagName(context);
 
@@ -154,8 +181,8 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                                  (new File(directory,
                                                                            dockerFileCommandCreator.FILENAME)).getAbsolutePath());
 
-            log.info("Docker file " + dockerfile + " created.");
-            log.info("Running command: " + processBuilderBuild.command());
+            engineLogger.info("Docker file " + dockerfile + " created.");
+            engineLogger.info("Running command: " + processBuilderBuild.command());
             // Start process build
             processBuild = processBuilderBuild.start();
 
@@ -164,7 +191,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             shutdownHook = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    handleShutdown();
+                    handleShutdown(context);
                 }
             });
             Runtime.getRuntime().addShutdownHook(shutdownHook);
@@ -184,7 +211,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
             processBuild = null;
 
-            log.info("Running command: " + processBuilderRun.command());
+            engineLogger.info("Running command: " + processBuilderRun.command());
 
             // Start process run
             processRun = processBuilderRun.start();
@@ -208,12 +235,12 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
             return exitValueBuild;
         } catch (IOException e) {
-            log.warn("Failed to execute Docker File.", e);
+            engineLogger.warn("Failed to execute Docker File.", e);
         } catch (InterruptedException e) {
-            log.info("Container execution interrupted. " + e.getMessage());
+            engineLogger.info("Container execution interrupted. " + e.getMessage());
         } finally {
 
-            handleShutdown();
+            handleShutdown(context);
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
         }
 
@@ -252,8 +279,9 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         try {
             ProcessBuilderUtilities.pipe(reader, stringWriter);
         } catch (IOException e) {
-            log.warn("Failed to convert Reader into StringWriter. Not possible to execute Docker File script.");
-            log.debug("Filed to convert Reader into StringWriter. Not possible to execute Docker File script.", e);
+            engineLogger.warn("Failed to convert Reader into StringWriter. Not possible to execute Docker File script.");
+            engineLogger.debug("Filed to convert Reader into StringWriter. Not possible to execute Docker File script.",
+                               e);
         }
 
         return eval(stringWriter.toString(), context);
@@ -269,7 +297,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return new DockerFileScriptEngineFactory();
     }
 
-    private void stopAndRemoveContainer(String containerTagName) {
+    private void stopAndRemoveContainer(String containerTagName, ScriptContext context) {
 
         // Create docker stop container command - a simple docker stop command 
         dockerStopCommand = dockerFileCommandCreator.createDockerStopExecutionCommand(containerTagName, bindings);
@@ -288,7 +316,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         //build processStop
         Process processStop;
         try {
-            log.info("Running command: " + processBuilderStop.command());
+            engineLogger.info("Running command: " + processBuilderStop.command());
             processStop = processBuilderStop.start();
 
             processBuilderUtilities.attachStreamsToProcess(processStop,
@@ -304,7 +332,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         //build processRM
         Process processRM;
         try {
-            log.info("Running command: " + processBuilderRM.command());
+            engineLogger.info("Running command: " + processBuilderRM.command());
             processRM = processBuilderRM.start();
 
             processBuilderUtilities.attachStreamsToProcess(processRM,
@@ -342,14 +370,19 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         }
     }
 
-    private void handleShutdown() {
+    private void handleShutdown(ScriptContext context) {
+        // unfortunately shutdown hooks are not run on windows when the process is terminated using
+        // process.destroy(). At the moment, this issue cannot be solved and docker file tasks cannot
+        // be killed properly on windows in ProActive Scheduler task fork mode (which uses process.destroy()).
+        // see https://bugs.openjdk.java.net/browse/JDK-8056139
+
         // Delete configuration file
         if (dockerfile != null && !DockerFilePropertyLoader.getInstance().isKeepDockerFile()) {
             boolean deleted = dockerfile.delete();
             if (!deleted) {
-                log.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
+                engineLogger.warn("File: " + dockerfile.getAbsolutePath() + " was not deleted.");
             } else {
-                log.info("Docker file " + dockerfile + " successfully deleted.");
+                engineLogger.info("Docker file " + dockerfile + " successfully deleted.");
             }
         }
 
@@ -362,11 +395,13 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         }
 
         if (containerStarted) {
-            stopAndRemoveContainer(containerTagName);
+            stopAndRemoveContainer(containerTagName, context);
         }
 
         if (imageCreated && !DockerFilePropertyLoader.getInstance().isKeepDockerFile()) {
             removeImage(imageTagName);
         }
+
+        cleanLogger();
     }
 }

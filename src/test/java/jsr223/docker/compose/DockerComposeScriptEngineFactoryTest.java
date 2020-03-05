@@ -33,6 +33,10 @@ import static org.mockito.Mockito.when;
 
 import javax.script.ScriptEngine;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import jsr223.docker.compose.utils.DockerComposeVersionGetter;
@@ -41,6 +45,13 @@ import processbuilder.utils.ProcessBuilderUtilities;
 
 
 public class DockerComposeScriptEngineFactoryTest {
+
+    @BeforeClass
+    public static void before() {
+        BasicConfigurator.resetConfiguration();
+        BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
+    }
 
     @Test(expected = NullPointerException.class)
     public void testThatVersionGetterCannotBeNull() {

@@ -33,6 +33,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -42,6 +44,7 @@ import org.ow2.proactive.scripting.ScriptResult;
 import org.ow2.proactive.scripting.SimpleScript;
 import org.ow2.proactive.scripting.TaskScript;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 
 
@@ -61,6 +64,7 @@ public class DockerFileScriptEngineTest {
     public static void before() {
         BasicConfigurator.resetConfiguration();
         BasicConfigurator.configure();
+        Logger.getRootLogger().setLevel(Level.INFO);
         DockerFilePropertyLoader.getInstance().setDockerFileCommand("docker");
         DockerFilePropertyLoader.getInstance().setUseSudo(false);
         DockerFilePropertyLoader.getInstance().setDockerHost("");
@@ -77,8 +81,10 @@ public class DockerFileScriptEngineTest {
         HashMap<String, Serializable> variablesMap = new HashMap<String, Serializable>(2);
         variablesMap.put(SchedulerVars.PA_JOB_ID.name(), "1");
         variablesMap.put(SchedulerVars.PA_TASK_ID.name(), "2");
-        Map<String, Object> aBindings = Collections.singletonMap(SchedulerConstants.VARIABLES_BINDING_NAME,
-                                                                 (Object) variablesMap);
+        Map<String, Object> aBindings = ImmutableMap.of(SchedulerConstants.VARIABLES_BINDING_NAME,
+                                                        (Object) variablesMap,
+                                                        SchedulerConstants.GENERIC_INFO_BINDING_NAME,
+                                                        Collections.EMPTY_MAP);
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
@@ -112,8 +118,10 @@ public class DockerFileScriptEngineTest {
         SimpleScript ss = new SimpleScript(dockerScript, DockerFileScriptEngineFactory.NAME);
         TaskScript taskScript = new TaskScript(ss);
 
-        Map<String, Object> aBindings = Collections.singletonMap(SchedulerConstants.DS_SCRATCH_BINDING_NAME,
-                                                                 (Object) tempDir.getAbsolutePath());
+        Map<String, Object> aBindings = ImmutableMap.of(SchedulerConstants.DS_SCRATCH_BINDING_NAME,
+                                                        (Object) tempDir.getAbsolutePath(),
+                                                        SchedulerConstants.GENERIC_INFO_BINDING_NAME,
+                                                        Collections.EMPTY_MAP);
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
@@ -144,7 +152,10 @@ public class DockerFileScriptEngineTest {
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-        ScriptResult<Serializable> res = taskScript.execute(null, new PrintStream(output), new PrintStream(output));
+        ScriptResult<Serializable> res = taskScript.execute(ImmutableMap.of(SchedulerConstants.GENERIC_INFO_BINDING_NAME,
+                                                                            Collections.EMPTY_MAP),
+                                                            new PrintStream(output),
+                                                            new PrintStream(output));
 
         System.out.println("Script output:");
         System.out.println(output.toString());
