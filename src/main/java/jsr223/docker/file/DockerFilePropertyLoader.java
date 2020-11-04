@@ -49,8 +49,6 @@ public class DockerFilePropertyLoader {
 
     public static final String DOCKER_FILE_KEEP = "docker.file.keepimage";
 
-    public static final String DOCKER_CONTAINER_KEEP = "docker.file.keepcontainer";
-
     @Getter
     @Setter
     private String dockerHost;
