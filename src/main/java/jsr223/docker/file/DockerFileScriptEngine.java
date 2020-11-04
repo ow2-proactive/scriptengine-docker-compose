@@ -26,7 +26,10 @@
 package jsr223.docker.file;
 
 import java.io.*;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.script.*;
 
@@ -55,6 +58,15 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private static final String DOCKER_HOST_PROPERTY_NAME = "DOCKER_HOST";
 
+    // generic information used to define actions to execute
+    public final static String DOCKER_ACTIONS_GI = "docker-actions";
+
+    public final static String DOCKER_IMAGE_TAG_GI = "docker-image-tag";
+
+    public final static String DOCKER_CONTAINER_TAG_GI = "docker-container-tag";
+
+    public final static String DOCKER_ACTIONS_DEFAULT = "build,run,stop,rmi";
+
     private ProcessBuilderUtilities processBuilderUtilities = new ProcessBuilderUtilities();
 
     private VariablesReplacer variablesReplacer = new VariablesReplacer();
@@ -71,6 +83,8 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
 
     private Process processBuild = null;
 
+    private Process processExec = null;
+
     public static final String DEFAULT_IMAGE_NAME = "image";
 
     public static final String DEFAULT_CONTAINER_NAME = "container";
@@ -82,6 +96,8 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
     private String[] dockerFileCommand = null;
 
     private String[] dockerRunCommand = null;
+
+    private String[] dockerExecCommand = null;
 
     private String[] dockerStopCommand = null;
 
@@ -104,6 +120,8 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
     private Logger engineLogger;
 
     private Appender engineLoggerAppender;
+
+    private Set<String> dockerActions = new HashSet<>();
 
     public DockerFileScriptEngine() {
         // This is the entry-point of the script engine
@@ -128,6 +146,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
     @Override
     public Object eval(String script, ScriptContext context) throws ScriptException {
         initLogger(context);
+        updateDockerActions(context);
         updateImageTagName(context);
         updateContainerTagName(context);
 
@@ -141,6 +160,9 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                                                     imageTagName,
                                                                                     bindings);
 
+        // Create docker run command - a simple docker run command
+        dockerExecCommand = dockerFileCommandCreator.createDockerExecExecutionCommand(containerTagName, bindings);
+
         // Create a process builder for building image
         ProcessBuilder processBuilderBuild = SingletonProcessBuilderFactory.getInstance()
                                                                            .getProcessBuilder(dockerFileCommand);
@@ -148,6 +170,10 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         // Create a process builder for running image
         ProcessBuilder processBuilderRun = SingletonProcessBuilderFactory.getInstance()
                                                                          .getProcessBuilder(dockerRunCommand);
+
+        // Create a process builder for running image
+        ProcessBuilder processBuilderExec = SingletonProcessBuilderFactory.getInstance()
+                                                                          .getProcessBuilder(dockerExecCommand);
 
         // Use process builder environment and fill it with environment variables
         Map<String, String> variablesMap = processBuilderBuild.environment();
@@ -180,13 +206,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             dockerfile = configurationFileWriter.forceFileToDisk(scriptReplacedVariables,
                                                                  (new File(directory,
                                                                            dockerFileCommandCreator.FILENAME)).getAbsolutePath());
-
             engineLogger.info("Docker file " + dockerfile + " created.");
-            engineLogger.info("Running command: " + processBuilderBuild.command());
-            // Start process build
-            processBuild = processBuilderBuild.start();
-
-            imageCreated = true;
 
             shutdownHook = new Thread(new Runnable() {
                 @Override
@@ -196,44 +216,27 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             });
             Runtime.getRuntime().addShutdownHook(shutdownHook);
 
-            // Attach streams
-            processBuilderUtilities.attachStreamsToProcess(processBuild,
-                                                           context.getWriter(),
-                                                           context.getErrorWriter(),
-                                                           context.getReader());
+            int exitValue = 0;
 
-            // Wait for process build to exit
-            int exitValueBuild = processBuild.waitFor();
-
-            if (exitValueBuild != 0) {
-                throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
+            if (dockerActions.contains(DockerFileCommandCreator.BUILD_ARGUMENT)) {
+                exitValue = runDockerBuildCommand(context, processBuilderBuild);
+            } else {
+                // assume that image is already built on this machine
+                imageCreated = true;
             }
 
-            processBuild = null;
-
-            engineLogger.info("Running command: " + processBuilderRun.command());
-
-            // Start process run
-            processRun = processBuilderRun.start();
-
-            containerStarted = true;
-
-            // Attach streams
-            processBuilderUtilities.attachStreamsToProcess(processRun,
-                                                           context.getWriter(),
-                                                           context.getErrorWriter(),
-                                                           context.getReader());
-
-            // Wait for process to exit
-            int exitValueRun = processRun.waitFor();
-
-            processRun = null;
-
-            if (exitValueRun != 0) {
-                throw new ScriptException("Docker Run failed with exit code " + exitValueBuild);
+            if (dockerActions.contains(DockerFileCommandCreator.RUN_ARGUMENT)) {
+                exitValue = runDockerRunCommand(context, processBuilderRun);
+            } else {
+                // assume that conatiner is already started on this machine
+                containerStarted = true;
             }
 
-            return exitValueBuild;
+            if (dockerActions.contains(DockerFileCommandCreator.EXEC_ARGUMENT)) {
+                exitValue = runDockerExecCommand(context, processBuilderExec);
+            }
+
+            return exitValue;
         } catch (IOException e) {
             engineLogger.warn("Failed to execute Docker File.", e);
         } catch (InterruptedException e) {
@@ -247,14 +250,107 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return null;
     }
 
+    private int runDockerRunCommand(ScriptContext context, ProcessBuilder processBuilderRun)
+            throws IOException, InterruptedException, ScriptException {
+        engineLogger.info("Running command: " + processBuilderRun.command());
+
+        // Start process run
+        processRun = processBuilderRun.start();
+
+        containerStarted = true;
+
+        // Attach streams
+        processBuilderUtilities.attachStreamsToProcess(processRun,
+                                                       context.getWriter(),
+                                                       context.getErrorWriter(),
+                                                       context.getReader());
+
+        // Wait for process to exit
+        int exitValueRun = processRun.waitFor();
+
+        processRun = null;
+
+        if (exitValueRun != 0) {
+            throw new ScriptException("Docker Run failed with exit code " + exitValueRun);
+        }
+        return exitValueRun;
+    }
+
+    private int runDockerExecCommand(ScriptContext context, ProcessBuilder processBuilderExec)
+            throws IOException, InterruptedException, ScriptException {
+        engineLogger.info("Running command: " + processBuilderExec.command());
+
+        // Start process run
+        processExec = processBuilderExec.start();
+
+        // Attach streams
+        processBuilderUtilities.attachStreamsToProcess(processExec,
+                                                       context.getWriter(),
+                                                       context.getErrorWriter(),
+                                                       context.getReader());
+
+        // Wait for process to exit
+        int exitValueExec = processExec.waitFor();
+
+        processExec = null;
+
+        if (exitValueExec != 0) {
+            throw new ScriptException("Docker Exec failed with exit code " + exitValueExec);
+        }
+        return exitValueExec;
+    }
+
+    private int runDockerBuildCommand(ScriptContext context, ProcessBuilder processBuilderBuild)
+            throws IOException, InterruptedException, ScriptException {
+        engineLogger.info("Running command: " + processBuilderBuild.command());
+        // Start process build
+        processBuild = processBuilderBuild.start();
+
+        imageCreated = true;
+
+        // Attach streams
+        processBuilderUtilities.attachStreamsToProcess(processBuild,
+                                                       context.getWriter(),
+                                                       context.getErrorWriter(),
+                                                       context.getReader());
+
+        // Wait for process build to exit
+        int exitValueBuild = processBuild.waitFor();
+
+        if (exitValueBuild != 0) {
+            throw new ScriptException("Docker File Build failed with exit code " + exitValueBuild);
+        }
+
+        processBuild = null;
+        return exitValueBuild;
+    }
+
     private void updateImageTagName(ScriptContext context) {
         if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.VARIABLES_BINDING_NAME)) {
             Map<String, Serializable> variables = (Map<String, Serializable>) context.getBindings(ScriptContext.ENGINE_SCOPE)
                                                                                      .get(SchedulerConstants.VARIABLES_BINDING_NAME);
             if (variables.containsKey(SchedulerVars.PA_JOB_ID.name()) &&
                 variables.containsKey(SchedulerVars.PA_TASK_ID.name())) {
-                imageTagName = imageTagName + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
+                imageTagName = DEFAULT_IMAGE_NAME + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
                                variables.get(SchedulerVars.PA_TASK_ID.name());
+            }
+        }
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.GENERIC_INFO_BINDING_NAME)) {
+            Map<String, String> genericInfo = (Map<String, String>) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                                                           .get(SchedulerConstants.GENERIC_INFO_BINDING_NAME);
+            if (genericInfo.containsKey(DOCKER_IMAGE_TAG_GI)) {
+                imageTagName = genericInfo.get(DOCKER_IMAGE_TAG_GI);
+            }
+        }
+    }
+
+    private void updateDockerActions(ScriptContext context) {
+        dockerActions = new HashSet<>(Arrays.asList(DOCKER_ACTIONS_DEFAULT.split("\\s*,\\s*")));
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.GENERIC_INFO_BINDING_NAME)) {
+            Map<String, String> genericInfo = (Map<String, String>) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                                                           .get(SchedulerConstants.GENERIC_INFO_BINDING_NAME);
+            if (genericInfo.containsKey(DOCKER_ACTIONS_GI)) {
+                dockerActions = new HashSet<>(Arrays.asList(genericInfo.get(DOCKER_ACTIONS_GI).split("\\s*,\\s*")));
             }
         }
     }
@@ -265,8 +361,15 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                                                      .get(SchedulerConstants.VARIABLES_BINDING_NAME);
             if (variables.containsKey(SchedulerVars.PA_JOB_ID.name()) &&
                 variables.containsKey(SchedulerVars.PA_TASK_ID.name())) {
-                containerTagName = containerTagName + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
+                containerTagName = DEFAULT_CONTAINER_NAME + "_" + variables.get(SchedulerVars.PA_JOB_ID.name()) + "t" +
                                    variables.get(SchedulerVars.PA_TASK_ID.name());
+            }
+        }
+        if (context.getBindings(ScriptContext.ENGINE_SCOPE).containsKey(SchedulerConstants.GENERIC_INFO_BINDING_NAME)) {
+            Map<String, String> genericInfo = (Map<String, String>) context.getBindings(ScriptContext.ENGINE_SCOPE)
+                                                                           .get(SchedulerConstants.GENERIC_INFO_BINDING_NAME);
+            if (genericInfo.containsKey(DOCKER_CONTAINER_TAG_GI)) {
+                containerTagName = genericInfo.get(DOCKER_CONTAINER_TAG_GI);
             }
         }
     }
@@ -394,11 +497,15 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             processRun.destroy();
         }
 
-        if (containerStarted) {
+        if (processExec != null) {
+            processExec.destroy();
+        }
+
+        if (containerStarted && dockerActions.contains(DockerFileCommandCreator.STOP_ARGUMENT)) {
             stopAndRemoveContainer(containerTagName, context);
         }
 
-        if (imageCreated && !DockerFilePropertyLoader.getInstance().isKeepDockerFile()) {
+        if (imageCreated && dockerActions.contains(DockerFileCommandCreator.RMI_ARGUMENT)) {
             removeImage(imageTagName);
         }
 

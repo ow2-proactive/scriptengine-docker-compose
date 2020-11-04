@@ -31,7 +31,8 @@ import javax.script.Bindings;
 
 import org.ow2.proactive.scheduler.common.SchedulerConstants;
 
-import jsr223.docker.compose.utils.CommandlineOptionsFromBindingsExtractor;
+import com.google.common.collect.ImmutableList;
+
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j;
 
@@ -52,6 +53,8 @@ public class DockerFileCommandCreator {
     // Constants for running the container
     public static final String RUN_ARGUMENT = "run";
 
+    public static final String EXEC_ARGUMENT = "exec";
+
     // Constants for stopping the container
     public static final String STOP_ARGUMENT = "stop";
 
@@ -68,6 +71,12 @@ public class DockerFileCommandCreator {
     public final static String DOCKER_BUILD_COMMANDLINE_OPTIONS_KEY = "docker-build-options";
 
     public final static String DOCKER_RUN_COMMANDLINE_OPTIONS_KEY = "docker-run-options";
+
+    public final static String DOCKER_EXEC_COMMANDLINE_OPTIONS_KEY = "docker-exec-options";
+
+    public final static String DOCKER_EXEC_COMMANDLINE_DEFAULT_OPTIONS = "-t";
+
+    public final static String DOCKER_EXEC_COMMAND_KEY = "docker-exec-command";
 
     public final static String DOCKER_STOP_COMMANDLINE_OPTIONS_KEY = "docker-stop-options";
 
@@ -121,6 +130,34 @@ public class DockerFileCommandCreator {
 
         // Add image
         command.add(imageTagName);
+
+        return command.toArray(new String[command.size()]);
+    }
+
+    public String[] createDockerExecExecutionCommand(String containerTagName, Bindings bindings) {
+        List<String> command = new ArrayList<>();
+        addSudoAndDockerFileCommand(command);
+
+        // Add the build command
+        command.add(EXEC_ARGUMENT);
+
+        // Add custom options
+        if (hasOption(bindings, DOCKER_EXEC_COMMANDLINE_OPTIONS_KEY)) {
+            command.addAll(getDockerCommandOptions(bindings, DOCKER_EXEC_COMMANDLINE_OPTIONS_KEY));
+        } else {
+            command.addAll(getExecDefaultOptions());
+        }
+
+        // Add container tag name
+        command.add(containerTagName);
+
+        List<String> commandToExecute = getDockerCommandOptions(bindings, DOCKER_EXEC_COMMAND_KEY);
+        if (commandToExecute.isEmpty()) {
+            commandToExecute = ImmutableList.of("/bin/sh", "-c", "echo 'no-command'");
+        }
+
+        // Add command to run
+        command.addAll(commandToExecute);
 
         return command.toArray(new String[command.size()]);
     }
@@ -197,6 +234,11 @@ public class DockerFileCommandCreator {
         return (Map<String, String>) bindingsObject;
     }
 
+    public boolean hasOption(Bindings bindings, String keyName) {
+        Map<String, String> genericInformationMap = extractGenericInfo(bindings);
+        return genericInformationMap.containsKey(keyName);
+    }
+
     public List<String> getDockerCommandOptions(Bindings bindings, String keyName) {
         Map<String, String> genericInformationMap = extractGenericInfo(bindings);
         List<String> generalCmdOptions = Collections.emptyList();
@@ -209,6 +251,11 @@ public class DockerFileCommandCreator {
             generalCmdOptions = Arrays.asList(genericInformationMap.get(keyName).split(splitCharacter));
         }
         return generalCmdOptions;
+    }
+
+    private List<String> getExecDefaultOptions() {
+        return Arrays.asList(DOCKER_EXEC_COMMANDLINE_DEFAULT_OPTIONS.split(" "));
+
     }
 
 }
