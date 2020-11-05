@@ -211,7 +211,11 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
             shutdownHook = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    handleShutdown(context);
+                    try {
+                        handleShutdown(context);
+                    } catch (ScriptException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             });
             Runtime.getRuntime().addShutdownHook(shutdownHook);
@@ -400,7 +404,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         return new DockerFileScriptEngineFactory();
     }
 
-    private void stopAndRemoveContainer(String containerTagName, ScriptContext context) {
+    private void stopAndRemoveContainer(String containerTagName, ScriptContext context) throws ScriptException {
 
         // Create docker stop container command - a simple docker stop command 
         dockerStopCommand = dockerFileCommandCreator.createDockerStopExecutionCommand(containerTagName, bindings);
@@ -417,6 +421,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                                         .getProcessBuilder(dockerRMCommand);
 
         //build processStop
+        int exitValue = 0;
         Process processStop;
         try {
             engineLogger.info("Running command: " + processBuilderStop.command());
@@ -426,10 +431,17 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
-            processStop.waitFor();
+            exitValue = processStop.waitFor();
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+            ScriptException exception = new ScriptException("Error when running docker stop");
+            exception.initCause(e);
+            throw exception;
+        }
+
+        if (exitValue != 0) {
+            throw new ScriptException("Docker stop failed with exit code " + exitValue);
         }
 
         //build processRM
@@ -442,14 +454,21 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
-            processRM.waitFor();
+            exitValue = processRM.waitFor();
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+            ScriptException exception = new ScriptException("Error when running docker rm");
+            exception.initCause(e);
+            throw exception;
+        }
+
+        if (exitValue != 0) {
+            throw new ScriptException("Docker rm failed with exit code " + exitValue);
         }
     }
 
-    private void removeImage(String imageTagName) {
+    private void removeImage(String imageTagName) throws ScriptException {
 
         // Create docker remove image command - a simple docker rmi command 
         dockerRMICommand = dockerFileCommandCreator.createDockerRemoveImage(imageTagName);
@@ -459,6 +478,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                                          .getProcessBuilder(dockerRMICommand);
 
         Process processRMI;
+        int exitValue = 0;
         try {
             processRMI = processBuilderRMI.start();
 
@@ -466,14 +486,21 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
                                                            context.getWriter(),
                                                            context.getErrorWriter(),
                                                            context.getReader());
-            processRMI.waitFor();
+            exitValue = processRMI.waitFor();
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace(new PrintWriter(context.getErrorWriter()));
+            ScriptException exception = new ScriptException("Error when running docker rmi");
+            exception.initCause(e);
+            throw exception;
+        }
+
+        if (exitValue != 0) {
+            throw new ScriptException("Docker rmi failed with exit code " + exitValue);
         }
     }
 
-    private void handleShutdown(ScriptContext context) {
+    private void handleShutdown(ScriptContext context) throws ScriptException {
         // unfortunately shutdown hooks are not run on windows when the process is terminated using
         // process.destroy(). At the moment, this issue cannot be solved and docker file tasks cannot
         // be killed properly on windows in ProActive Scheduler task fork mode (which uses process.destroy()).
