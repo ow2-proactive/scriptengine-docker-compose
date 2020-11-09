@@ -468,10 +468,10 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         }
     }
 
-    private void removeImage(String imageTagName) throws ScriptException {
+    private void removeImage(String imageTagName, ScriptContext context) throws ScriptException {
 
         // Create docker remove image command - a simple docker rmi command 
-        dockerRMICommand = dockerFileCommandCreator.createDockerRemoveImage(imageTagName);
+        dockerRMICommand = dockerFileCommandCreator.createDockerRemoveImage(imageTagName, bindings);
 
         // Create a process builder for removing image
         ProcessBuilder processBuilderRMI = SingletonProcessBuilderFactory.getInstance()
@@ -533,7 +533,7 @@ public class DockerFileScriptEngine extends AbstractScriptEngine {
         }
 
         if (imageCreated && dockerActions.contains(DockerFileCommandCreator.RMI_ARGUMENT)) {
-            removeImage(imageTagName);
+            removeImage(imageTagName, context);
         }
 
         cleanLogger();

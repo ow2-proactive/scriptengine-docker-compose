@@ -80,6 +80,8 @@ public class DockerFileCommandCreator {
 
     public final static String DOCKER_STOP_COMMANDLINE_OPTIONS_KEY = "docker-stop-options";
 
+    public final static String DOCKER_RM_COMMANDLINE_OPTIONS_KEY = "docker-rm-options";
+
     public final static String DOCKER_RMI_COMMANDLINE_OPTIONS_KEY = "docker-rmi-options";
 
     public final static String DOCKER_FILE_COMMANDLINE_OPTIONS_SPLIT_REGEX_KEY = "docker-file-options-split-regex";
@@ -186,7 +188,7 @@ public class DockerFileCommandCreator {
         command.add(RM_ARGUMENT);
 
         // Add custom options
-        command.addAll(getDockerCommandOptions(bindings, DOCKER_RMI_COMMANDLINE_OPTIONS_KEY));
+        command.addAll(getDockerCommandOptions(bindings, DOCKER_RM_COMMANDLINE_OPTIONS_KEY));
 
         // Add the tag name
         command.add(containerTagName);
@@ -194,12 +196,15 @@ public class DockerFileCommandCreator {
         return command.toArray(new String[command.size()]);
     }
 
-    public String[] createDockerRemoveImage(String imageTagName) {
+    public String[] createDockerRemoveImage(String imageTagName, Bindings bindings) {
         List<String> command = new ArrayList<>();
         addSudoAndDockerFileCommand(command);
 
         // Add the build command
         command.add(RMI_ARGUMENT);
+
+        // Add custom options
+        command.addAll(getDockerCommandOptions(bindings, DOCKER_RMI_COMMANDLINE_OPTIONS_KEY));
 
         // Add the tag name
         command.add(imageTagName);
